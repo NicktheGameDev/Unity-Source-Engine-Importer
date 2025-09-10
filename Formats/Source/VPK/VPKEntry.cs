@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 
 namespace uSource.Formats.Source.VPK
 {
@@ -7,14 +8,15 @@ namespace uSource.Formats.Source.VPK
 		public bool HasPreloadData { get; set; }
 		public uint Length => EntryLength;
 
-		internal uint CRC;
+
+        internal uint CRC;
 		internal ushort PreloadBytes;
 		internal uint PreloadDataOffset;
 		internal ushort ArchiveIndex;
 		internal uint EntryOffset;
 		internal uint EntryLength;
 		internal VPKFile ParentArchive;
-
+		
 		internal VPKEntry(VPKFile parentArchive, uint crc, ushort preloadBytes, uint preloadDataOffset, ushort archiveIndex, uint entryOffset, uint entryLength)
 		{
 			ParentArchive = parentArchive;

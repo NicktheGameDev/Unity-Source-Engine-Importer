@@ -11,7 +11,7 @@ namespace uSource
 	public class MDLArmatureInfo : MonoBehaviour
 	{
 		//public MdlSpec.AniInfo[] aniDescs;
-		public StudioStruct.SeqInfo[] seqDescs;
+		public SeqInfo seqDescs;
 		public GameObject ModelObject;
 		public Transform rootNode;
 		public Transform[] boneNodes;

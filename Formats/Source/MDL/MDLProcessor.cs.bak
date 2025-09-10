@@ -1,0 +1,119 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using UnityEngine;
+using uSource.Formats.Source.MDL;
+public class MDLProcessor : MonoBehaviour
+{
+    private GameObject modelObject;
+    private List<JiggleBone> jiggleBonesList = new List<JiggleBone>();
+   private MDLFile MDLFile = new MDLFile(FileInput, new mstudioevent_t[0]);
+    public bool EnableJiggleBones = true;
+    public bool EnableEyeMovement = true;
+    private static Stream FileInput;
+
+    // Initialize the model processing
+    public void ProcessModel(GameObject model)
+    {
+        modelObject = model;
+
+        if (EnableJiggleBones)
+        {
+            InitializeJiggleBones(modelObject);
+        }
+
+        if (EnableEyeMovement)
+        {
+            Debug.Log("Eye movement initialized.");
+        }
+
+        Debug.Log("Model processing completed.");
+    }
+
+    private void InitializeJiggleBones(GameObject model)
+    {
+        Transform[] bones = GetModelBones(model);
+        jiggleBonesList.Clear();
+
+        foreach (var jiggleBoneData in MDLFile.MDL_JiggleBones)
+        {
+            Transform boneTransform = bones[jiggleBoneData.bone];
+            if (boneTransform != null)
+            {
+                JiggleBone jiggle = new JiggleBone(boneTransform,0,0,0,0)
+                {
+                    Stiffness = jiggleBoneData.baseStiffness,
+                    Damping = jiggleBoneData.baseDamping,
+                    Mass = jiggleBoneData.baseMass,
+                    Length = jiggleBoneData.length
+                };
+                jiggleBonesList.Add(jiggle);
+            }
+        }
+        Debug.Log("Jigglebones initialized.");
+    }
+
+    private Transform[] GetModelBones(GameObject model)
+    {
+        Transform[] bones = new Transform[MDLFile.MDL_Header.bone_count];
+
+        for (int i = 0; i < MDLFile.MDL_Header.bone_count; i++)
+        {
+            string boneName = MDLFile.MDL_BoneNames[i];
+            Transform boneTransform = model.transform.Find(boneName);
+
+            if (boneTransform != null)
+            {
+                bones[i] = boneTransform;
+            }
+            else
+            {
+                // Debug.LogWarning (removed)($"Bone '{boneName}' not found.");
+            }
+        }
+        return bones;
+    }
+
+    private void Update()
+    {
+        if (EnableJiggleBones)
+        {
+            UpdateJiggleBones();
+        }
+
+        if (EnableEyeMovement)
+        {
+            UpdateEyeMovement(modelObject);
+        }
+    }
+
+    private void UpdateJiggleBones()
+    {
+        foreach (var jiggle in jiggleBonesList)
+        {
+            jiggle.UpdateJiggleBone(Time.deltaTime, jiggle.BoneTransform.parent.position, transform.position);
+        }
+    }
+
+    private void UpdateEyeMovement(GameObject model)
+    {
+        if (Camera.main == null) return;
+
+        Transform[] bones = GetModelBones(model);
+        Vector3 targetPosition = Camera.main.transform.position;
+
+        foreach (var eye in MDLFile.MDL_Eyeballs)
+        {
+            Transform eyeBone = bones[eye.bone];
+            if (eyeBone == null) continue;
+
+            Vector3 direction = (targetPosition - eyeBone.position).normalized;
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            eyeBone.rotation = Quaternion.Slerp(eyeBone.rotation, targetRotation, 0.1f);
+        }
+    }
+}
+

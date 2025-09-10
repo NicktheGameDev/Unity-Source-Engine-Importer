@@ -1,0 +1,77 @@
+﻿using UnityEngine;
+using UnityEditor;
+
+using System.Collections.Generic;
+using System.Linq;
+using System;
+#if UNITY_EDITOR
+using UnityEditor.Animations;
+
+public static class AnimatorHelper
+{
+#if UNITY_EDITOR
+    public static AnimationCurve AddAnimationClipToController(AnimatorController controller, AnimationClip clip, string stateName)
+    {
+        // Check if the controller already has a state with the same name
+        foreach (var layer in controller.layers)
+        {
+            foreach (var state in layer.stateMachine.states)
+            {
+                if (state.state.name == stateName)
+                {
+                    // Debug.LogWarning (removed)($"State '{stateName}' already exists in the Animator Controller.");
+                    return new();
+                }
+            }
+        }
+
+        // Add the new state with the animation clip
+        var rootStateMachine = controller.layers[0].stateMachine;
+        var newState = rootStateMachine.AddState(stateName);
+        newState.motion = clip;
+
+
+        return new();
+
+    }
+#endif
+
+#if UNITY_EDITOR
+
+    public static AnimationCurve BlendAnimationClips(AnimatorController controller, AnimationClip clipA, AnimationClip clipB,AnimationCurve blendTime, string blendStateName)
+    {
+        // Create a new blend tree
+        var blendTree = new BlendTree
+        {
+            name = blendStateName,
+            blendType = BlendTreeType.Simple1D,
+            useAutomaticThresholds = false
+        };
+
+        // Create a parameter to control the blend tree
+        string blendParameter = "Blend";
+        if (!controller.parameters.Any(p => p.name == blendParameter))
+        {
+            controller.AddParameter(blendParameter, AnimatorControllerParameterType.Float);
+        }
+
+        // Add the animation clips to the blend tree
+        blendTree.AddChild(clipA, 0f);
+        blendTree.AddChild(clipB, 1f);
+
+        // Create a new state in the controller with the blend tree
+        var rootStateMachine = controller.layers[0].stateMachine;
+        var blendState = rootStateMachine.AddState(blendStateName);
+        blendState.motion = blendTree;
+
+
+        return new();
+    }
+
+
+#endif
+
+}
+
+
+#endif

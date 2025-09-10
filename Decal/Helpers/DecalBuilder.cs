@@ -9,12 +9,12 @@ namespace uSource.Decals
     {
         private static readonly MeshBuilder Builder = new MeshBuilder();
 
-        public static void Build(Decal decal)
+        public static void Build(Decal_ decal)
         {
             Build(Builder, decal);
         }
 
-        private static void Build(MeshBuilder builder, Decal decal)
+        private static void Build(MeshBuilder builder, Decal_ decal)
         {
             var filter = decal.MeshFilter;
             var renderer = decal.MeshRenderer;
@@ -34,7 +34,7 @@ namespace uSource.Decals
             }
         }
 
-        private static void Build_(MeshBuilder builder, Decal decal)
+        private static void Build_(MeshBuilder builder, Decal_ decal)
         {
             var objects = DecalUtils.GetAffectedObjects(decal);
             var terrains = DecalUtils.GetAffectedTerrains(decal);
@@ -64,7 +64,7 @@ namespace uSource.Decals
         }
 
         // Helpers
-        private static bool Filter(Triangle triangle, Decal decal)
+        private static bool Filter(Triangle triangle, Decal_ decal)
         {
             var normal = GetNormal(triangle);
             return Vector3.Angle(Vector3.back, normal) <= decal.MaxAngle;

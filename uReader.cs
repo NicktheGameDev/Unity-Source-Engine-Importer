@@ -8,9 +8,30 @@ namespace uSource
 {
     public class uReader : BinaryReader
     {
+        public Quaternion ReadQuaternion48( )
+        {
+            var q48 = new Quaternion48();
+            ReadTypeFixed(ref q48, 6);
+            return q48.quaternion;
+        }
+
+        public Quaternion ReadQuaternion64()
+        {
+            var q64 = new Quaternion64();
+            ReadTypeFixed(ref q64, 8);
+            return q64.quaternion;
+        }
+
+        public Vector3 ReadVector48()
+        {
+            var v48 = new FVector48();
+            ReadTypeFixed(ref v48, 6);
+            return v48.ToVector3();
+        }
+
         public Stream InputStream;
 
-        public uReader(Stream InputStream) 
+        public uReader(Stream InputStream)
             : base(InputStream)
         {
             this.InputStream = InputStream;
@@ -29,7 +50,7 @@ namespace uSource
 
             return Buffer;
         }
-
+  
         public void ReadType<T>(ref T Variable, long? Offset = null)
         {
             if (Offset.HasValue)
@@ -88,24 +109,27 @@ namespace uSource
 
         [ThreadStatic]
         private static StringBuilder _sBuilder;
-        public String ReadNullTerminatedString(long? Offset = null)
+        public string ReadNullTerminatedString(int? offset = null)
         {
-            if (Offset.HasValue && !Offset.Value.Equals(InputStream.Position))
-                InputStream.Seek(Offset.Value, SeekOrigin.Begin);
-
-            if (_sBuilder == null) 
-                _sBuilder = new StringBuilder();
-            else 
-                _sBuilder.Remove(0, _sBuilder.Length);
-
-            while (true)
+            // if caller passed an explicit offset, seek there (but only if valid)
+            if (offset.HasValue)
             {
-                Char c = (char)InputStream.ReadByte();
-                if (c == 0) 
-                    return _sBuilder.ToString();
-
-                _sBuilder.Append(c);
+                long len = BaseStream.Length;
+                if (offset < 0 || offset >= len)
+                    return String.Empty;
+                BaseStream.Position = offset.Value;
             }
+
+            // now read until we hit a 0 byte or the end of the stream
+            var sb = new System.Text.StringBuilder();
+            long max = BaseStream.Length;
+            while (BaseStream.Position < max)
+            {
+                int b = ReadByte();
+                if (b == 0) break;
+                sb.Append((char)b);
+            }
+            return sb.ToString();
         }
 
         public Vector3 ReadVector2D()
@@ -115,6 +139,19 @@ namespace uSource
             Vector2D.y = ReadSingle();
 
             return Vector2D;
+        }
+        // Czyta tablicę struktur o stałym rozmiarze
+        public T[] ReadTypeFixed<T>(int count, int offset) where T : struct
+        {
+            int stride = Marshal.SizeOf<T>();
+            var arr = new T[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                // wczytujemy elementy jeden po drugim
+                ReadTypeFixed(ref arr[i], stride, offset + i * stride);
+            }
+            return arr;
         }
 
         public Vector3 ReadVector3D(bool SwapZY = true)

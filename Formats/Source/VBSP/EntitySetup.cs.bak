@@ -1,0 +1,909 @@
+﻿using System.Linq;
+using System.Collections.Generic;
+using UnityEngine;
+using uSource.Decals;
+using uSource.Formats.Source.VTF;
+using uSource.MathLib;
+using uSource.Example;
+using System;
+using uSource;
+
+using System.Security.Cryptography;
+
+namespace uSource.Formats.Source.VBSP
+{
+    //TODO:
+    //Rework this & make
+
+    public static class EntitySetup
+    {
+        public static void PlaceRopes(string bspEntityData, GameObject world, GameObject ropePrefab)
+        {
+            // Parse entities from BSP data
+            List<SourceEntity> entities = BSPParser.ParseEntities(bspEntityData);
+
+            // Container for ropes
+            GameObject staticContainer = new GameObject("Ropes");
+            staticContainer.transform.SetParent(world.transform);
+
+            int ropeIndex = 1;
+            foreach (var entity in entities)
+            {
+                // Process ropes based on classname
+                if (entity.GetStringValue("classname") != "keyframe_rope" && entity.GetStringValue("classname") != "move_rope")
+                    continue;
+
+                SourceEntity nextEntity = GetEntityByName(entities, entity.GetStringValue("NextKey"));
+                if (nextEntity == null)
+                    continue;
+
+                GameObject ropeObject = UnityEngine.Object.Instantiate(ropePrefab);
+                ropeObject.name = $"Rope_{ropeIndex}";
+
+                RopeSim ropeSim = ropeObject.GetComponentInChildren<RopeSim>();
+                RopeMeshRenderer ropeMeshRenderer = ropeObject.GetComponentInChildren<RopeMeshRenderer>();
+
+                if (ropeSim != null && ropeMeshRenderer != null)
+                {
+                    Vector3 startPos = SourceToUnityPosition(entity.GetVectorValue("origin"));
+                    Vector3 endPos = SourceToUnityPosition(nextEntity.GetVectorValue("origin"));
+
+                    ropeSim.start.position = startPos;
+                    ropeSim.end.position = endPos;
+
+                    SetupRopeType(ropeSim, ropeMeshRenderer, entity.GetStringValue("classname"));
+                    ropeObject.transform.SetParent(staticContainer.transform);
+                    ropeIndex++;
+                }
+                else
+                {
+                    // Debug.LogError (removed)("RopeSim or RopeMeshRenderer component missing on ropePrefab.");
+                }
+            }
+            Debug.Log("Ropes placed successfully.");
+        }
+
+        private static void SetupRopeType(RopeSim ropeSim, RopeMeshRenderer ropeMeshRenderer, string classname)
+        {
+            if (classname == "keyframe_rope")
+            {
+                ropeSim.ConfigureKeyframeSettings(ropeSim.settleTime, ropeSim.animationLength, ropeSim.animationFPS, ropeSim.recordAnimation);
+                ropeMeshRenderer.CreateRope(ropeSim.start.position, ropeSim.end.position);
+            }
+            else if (classname == "move_rope")
+            {
+                ropeSim.ConfigureMovementSettings(ropeSim.gravity.sqrMagnitude, ropeSim.strength, ropeSim.damping, ropeSim.noise, ropeSim.windDirection, ropeSim.windAmount);
+                ropeMeshRenderer.CreateRope(ropeSim.start.position, ropeSim.end.position);
+            }
+            else
+            {
+                // Debug.LogWarning (removed)("Unknown rope type: " + classname);
+            }
+        }
+
+        private static SourceEntity GetEntityByName(List<SourceEntity> entities, string targetname)
+        {
+            foreach (var entity in entities)
+            {
+                if (entity.GetStringValue("targetname") == targetname)
+                    return entity;
+            }
+            return null;
+        }
+
+        private static Vector3 SourceToUnityPosition(Vector3 source)
+        {
+            return new Vector3(source.x, source.z, source.y) * 0.0254f; // Converts Source to Unity scale
+        }
+
+        public static void Configure(this Transform transform, List<String> Data)
+            {
+                //return;
+                String Classname = Data[Data.FindIndex(n => n == "classname") + 1], Targetname = Data[Data.FindIndex(n => n == "targetname") + 1];
+                transform.name = Classname;
+
+                //ResourceManager.LoadModel("editor/axis_helper").SetParent(transform, false);
+
+                Int32 OriginIndex = Data.FindIndex(n => n == "origin");
+                if (OriginIndex != -1)
+                {
+                    //Old but gold
+                    String[] origin = Data[OriginIndex + 1].Split(' ');
+
+                    while (origin.Length != 3)
+                    {
+                        Int32 TempIndex = OriginIndex + 1;
+                        origin = Data[Data.FindIndex(TempIndex, n => n == "origin") + 1].Split(' ');
+                    }
+                    //Old but gold
+
+                    transform.position = new Vector3(-origin[1].ToSingle(), origin[2].ToSingle(), origin[0].ToSingle()) * uLoader.UnitScale;
+                }
+
+                Int32 AnglesIndex = Data.FindIndex(n => n == "angles");
+                if (AnglesIndex != -1)
+                {
+                    Vector3 EulerAngles = Data[AnglesIndex + 1].ToVector3();
+
+                    EulerAngles = new Vector3(EulerAngles.x, -EulerAngles.y, -EulerAngles.z);
+
+                    if (Classname.StartsWith("light", StringComparison.Ordinal))
+                        EulerAngles.x = -EulerAngles.x;
+
+                    Int32 PitchIndex = Data.FindIndex(n => n == "pitch");
+                    //Lights
+                    if (PitchIndex != -1)
+                        EulerAngles.x = -Data[PitchIndex + 1].ToSingle();
+
+                    transform.eulerAngles = EulerAngles;
+                }
+
+                if (Classname.Contains("trigger"))
+                {
+                    for (Int32 i = 0; i < transform.childCount; i++)
+                    {
+                        GameObject Child = transform.GetChild(i).gameObject;
+                        Child.SetActive(false);
+                        Child.AddComponent<BoxCollider>().isTrigger = true;
+                    }
+                }
+
+#if UNITY_EDITOR
+                if (Classname.Equals("env_sprite"))
+                {
+                    //TODO: fix scale
+                    LensFlare lensFlare = transform.gameObject.AddComponent<LensFlare>();
+
+                    if (VBSPFile.GlowFlare == null)
+                    {
+                        String path = UnityEditor.AssetDatabase.GUIDToAssetPath(UnityEditor.AssetDatabase.FindAssets("Glow t:Flare")[0]);
+                        VBSPFile.GlowFlare = UnityEditor.AssetDatabase.LoadAssetAtPath<Flare>(path);
+                    }
+
+                    lensFlare.flare = VBSPFile.GlowFlare;
+                    lensFlare.brightness = Data[Data.FindIndex(n => n == "scale") + 1].ToSingle();
+                    lensFlare.fadeSpeed = Data[Data.FindIndex(n => n == "GlowProxySize") + 1].ToSingle();
+                    lensFlare.color = Data[Data.FindIndex(n => n == "rendercolor") + 1].ToColor32();
+
+                    return;
+                }
+#endif
+
+                /*if (Classname.Equals("point_viewcontrol"))
+                {
+                    transform.gameObject.AddComponent<point_viewcontrol>().Start();
+                }*/
+
+                //3D Skybox
+                if (uLoader.Use3DSkybox && Classname.Equals("sky_camera"))
+                {
+                    //Setup 3DSkybox
+                    Camera playerCamera = new GameObject("CameraPlayer").AddComponent<Camera>();
+                    Camera skyCamera = transform.gameObject.AddComponent<Camera>();
+
+                    CameraFly camFly = playerCamera.gameObject.AddComponent<CameraFly>();
+                    camFly.skyScale = Data[Data.FindIndex(n => n == "scale") + 1].ToSingle();
+                    camFly.offset3DSky = transform.position;
+                    camFly.skyCamera = skyCamera.transform;
+
+                    playerCamera.depth = -1;
+                    playerCamera.clearFlags = CameraClearFlags.Depth;
+
+                    skyCamera.depth = -2;
+                    skyCamera.clearFlags = CameraClearFlags.Skybox;
+                    //Setup 3DSkybox
+                    return;
+                }
+
+                #region the whole Black Mesa entities
+
+                //3D Skybox
+                if (Classname.Equals("info_player_start"))
+                {
+                    uResourceManager.LoadModel("editor/playerstart", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_healthcharger"))
+                {
+                    uResourceManager.LoadModel("props_blackmesa/health_charger", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_suitcharger"))
+                {
+                    uResourceManager.LoadModel("props_blackmesa/hev_charger", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_357"))
+                {
+                    uResourceManager.LoadModel("weapons/w_357", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_security"))
+                {
+                    uResourceManager.LoadModel("humans/guard", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_scientist_kleiner"))
+                {
+                    uResourceManager.LoadModel("humans/scientist_kliener", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_scientist_female"))
+                {
+                    uResourceManager.LoadModel("humans/scientist_female", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_scientist_eli"))
+                {
+                    uResourceManager.LoadModel("humans/scientist_eli", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_scientist"))
+                {
+                    uResourceManager.LoadModel("humans/scientist", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_crowbar"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crowbar", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_crossbow"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crossbow", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_frag"))
+                {
+                    uResourceManager.LoadModel("weapons/w_grenade", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_glock"))
+                {
+                    uResourceManager.LoadModel("weapons/w_glock", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_gluon"))
+                {
+                    uResourceManager.LoadModel("weapons/w_egon_pickup", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_hivehand"))
+                {
+                    uResourceManager.LoadModel("weapons/w_hgun", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_mp5", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_shotgun"))
+                {
+                    uResourceManager.LoadModel("weapons/w_shotgun", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpg", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_snark"))
+                {
+                    uResourceManager.LoadModel("xenians/snarknest", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_weapon_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpg_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_satchel"))
+                {
+                    uResourceManager.LoadModel("weapons/w_satchel_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_crowbar"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crowbar_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_crossbow"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crossbow_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_frag"))
+                {
+                    uResourceManager.LoadModel("weapons/w_grenade_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_glock"))
+                {
+                    uResourceManager.LoadModel("weapons/w_glock_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_gluon"))
+                {
+                    uResourceManager.LoadModel("weapons/w_egon_pickup_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_hivehand"))
+                {
+                    uResourceManager.LoadModel("weapons/w_hgun_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_mp5_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_shotgun"))
+                {
+                    uResourceManager.LoadModel("weapons/w_shotgun_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpg_mp", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_snark"))
+                {
+                    uResourceManager.LoadModel("xenians/snarknest", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_weapon_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpg", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_satchel"))
+                {
+                    uResourceManager.LoadModel("weapons/w_satchel", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_tau"))
+                {
+                    uResourceManager.LoadModel("weapons/w_gauss", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_tripmine"))
+                {
+                    uResourceManager.LoadModel("weapons/w_tripmine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_357"))
+                {
+                    uResourceManager.LoadModel("weapons/w_357ammobox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_ammo_crossbow"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crossbow_clip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_ammo_glock"))
+                {
+                    uResourceManager.LoadModel("weapons/w_9mmclip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_energy"))
+                {
+                    uResourceManager.LoadModel("weapons/w_gaussammo", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_9mmarclip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("info_bigmomma"))
+                {
+                    uResourceManager.LoadModel("editor/ground_node", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_shotgun"))
+                {
+                    uResourceManager.LoadModel("weapons/w_shotbox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_grenade_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_argrenade", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_grenade_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpgammo", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_canister"))
+                {
+                    uResourceManager.LoadModel("weapons/w_weaponbox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_crate"))
+                {
+                    uResourceManager.LoadModel("items/ammocrate_rockets", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_suit"))
+                {
+                    uResourceManager.LoadModel("props_am/hev_suit", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_battery"))
+                {
+                    uResourceManager.LoadModel("weapons/w_battery", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_healthkit"))
+                {
+                    uResourceManager.LoadModel("weapons/w_medkit", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_healthkit"))
+                {
+                    uResourceManager.LoadModel("weapons/w_medkit_classic", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_healthkit"))
+                {
+                    uResourceManager.LoadModel("weapons/w_medkit_stiff", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+
+                if (Classname.Equals("item_longjump"))
+                {
+                    uResourceManager.LoadModel("weapons/w_longjump", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("grenade_satchel"))
+                {
+                    uResourceManager.LoadModel("weapons/w_satchel", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("grenade_tripmine"))
+                {
+                    uResourceManager.LoadModel("weapons/w_tripmine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_tau"))
+                {
+                    uResourceManager.LoadModel("weapons/w_gauss", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_weapon_tripmine"))
+                {
+                    uResourceManager.LoadModel("weapons/w_tripmine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_357"))
+                {
+                    uResourceManager.LoadModel("weapons/w_357ammobox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("weapons/w_crossbow_clip"))
+                {
+                    uResourceManager.LoadModel("weapons/w_357ammobox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_crossbow"))
+                {
+                    uResourceManager.LoadModel("weapons/w_crossbow_clip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_ammo_glock"))
+                {
+                    uResourceManager.LoadModel("weapons/w_9mmclip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_energy"))
+                {
+                    uResourceManager.LoadModel("weapons/w_gaussammo", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_9mmarclip", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("info_bigmomma"))
+                {
+                    uResourceManager.LoadModel("editor/ground_node", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_shotgun"))
+                {
+                    uResourceManager.LoadModel("weapons/w_shotbox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_grenade_mp5"))
+                {
+                    uResourceManager.LoadModel("weapons/w_argrenade", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_grenade_rpg"))
+                {
+                    uResourceManager.LoadModel("weapons/w_rpgammo", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_canister"))
+                {
+                    uResourceManager.LoadModel("weapons/w_weaponbox", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_ammo_crate"))
+                {
+                    uResourceManager.LoadModel("items/ammocrate_rockets", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_suit"))
+                {
+                    uResourceManager.LoadModel("props_am/hev_suit", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_crate"))
+                {
+                    uResourceManager.LoadModel("props_generic/bm_supplycrate01", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("item_longjump"))
+                {
+                    uResourceManager.LoadModel("weapons/w_longjump", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("grenade_satchel"))
+                {
+                    uResourceManager.LoadModel("weapons/w_satchel", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("grenade_tripmine"))
+                {
+                    uResourceManager.LoadModel("weapons/w_tripmine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_nihilanth"))
+                {
+                    uResourceManager.LoadModel("xenians/nihilanth", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_ichthyosaur"))
+                {
+                    uResourceManager.LoadModel("ichthyosaur", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_maintenance"))
+                {
+                    uResourceManager.LoadModel("humans/maintenance/maintenance_1", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_gman"))
+                {
+                    uResourceManager.LoadModel("gman", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_generic"))
+                {
+                    uResourceManager.LoadModel("gman", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_barnacle"))
+                {
+                    uResourceManager.LoadModel("barnacle", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_xortEB"))
+                {
+                    uResourceManager.LoadModel("vortigaunt_slave", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_headcrab"))
+                {
+                    uResourceManager.LoadModel("headcrabclassic", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_headcrab_fast"))
+                {
+                    uResourceManager.LoadModel("Headcrab", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_headcrab_black"))
+                {
+                    uResourceManager.LoadModel("Headcrabblack", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_headcrab_baby"))
+                {
+                    uResourceManager.LoadModel("xenians/bebcrab", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_beneathticle"))
+                {
+                    uResourceManager.LoadModel("xenians/barnacle_underwater", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("physics_cannister"))
+                {
+                    uResourceManager.LoadModel("fire_equipment/w_weldtank", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("func_fish_pool"))
+                {
+                    uResourceManager.LoadModel("Junkola", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_bullsquid"))
+                {
+                    uResourceManager.LoadModel("xenians/bullsquid", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_houndeye"))
+                {
+                    uResourceManager.LoadModel("xenians/houndeye", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_bullsquid_melee"))
+                {
+                    uResourceManager.LoadModel("xenians/bullsquid", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_houndeye_suicide"))
+                {
+                    uResourceManager.LoadModel("xenians/houndeye_suicide", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_houndeye_knockback"))
+                {
+                    uResourceManager.LoadModel("xenians/houndeye_knockback", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_assassin"))
+                {
+                    uResourceManager.LoadModel("humans/hassassin", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_commander"))
+                {
+                    uResourceManager.LoadModel("humans/marine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_medic"))
+                {
+                    uResourceManager.LoadModel("humans/marine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("misc_xen_shield"))
+                {
+                    uResourceManager.LoadModel("xenians/shield/pentagonal.hexecontahedron/nihilanth/panel.%03d", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_grunt"))
+                {
+                    uResourceManager.LoadModel("humans/marine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_human_grenadier"))
+                {
+                    uResourceManager.LoadModel("humans/marine", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_xontroller"))
+                {
+                    uResourceManager.LoadModel("xenians/controller", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_grunt_unarmored"))
+                {
+                    uResourceManager.LoadModel("xenians/agrunt_unarmored", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_grunt_melee"))
+                {
+                    string text4 = Data[Data.FindIndex((string n) => n == "model") + 1];
+                    uResourceManager.LoadModel("xenians/agrunt_unarmored", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_grunt"))
+                {
+                    uResourceManager.LoadModel("xenians/agrunt", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_xen_grunt"))
+                {
+                    uResourceManager.LoadModel("xenians/agrunt", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_protozoan"))
+                {
+                    uResourceManager.LoadModel("xenians/protozoan", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_cockroach"))
+                {
+                    uResourceManager.LoadModel("fauna/roach", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_flyer_flock"))
+                {
+                    uResourceManager.LoadModel("xenians/flock", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_gargantua"))
+                {
+                    uResourceManager.LoadModel("xenians/garg", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_gonarch"))
+                {
+                    uResourceManager.LoadModel("xenians/gonarch", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_manta"))
+                {
+                    uResourceManager.LoadModel("xenians/manta_jet", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("npc_apache"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/apache", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_osprey"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/osprey", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_rat"))
+                {
+                    uResourceManager.LoadModel("fauna/rat", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_tentacle"))
+                {
+                    uResourceManager.LoadModel("xenians/tentacle", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_xentacle"))
+                {
+                    uResourceManager.LoadModel("xenians/xentacle", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_snark"))
+                {
+                    uResourceManager.LoadModel("xenians/snark", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("item_tow_missile"))
+                {
+                    uResourceManager.LoadModel("props_marines/tow_missile_projectile", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("npc_lav"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/lav", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+               
+              
+                if (Classname.Equals("npc_sentry_ceiling"))
+                {
+                    uResourceManager.LoadModel("npcs/sentry_ceiling", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("npc_alien_grunt_elite"))
+                {
+                    uResourceManager.LoadModel("xenians/agrunt", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_sentry_ground"))
+                {
+                    uResourceManager.LoadModel("npcs/sentry_ground", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("prop_train_awesome"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/oar_awesome_tram", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("prop_train_apprehension"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/oar_tram", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_scientist"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_sci", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_abrams"))
+                {
+                    uResourceManager.LoadModel("props_vehicles/abrams", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("env_mortar_controller"))
+                {
+                    uResourceManager.LoadModel("props_st/airstrike_map", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_scientist_torso"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_sci_torso", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_grunt"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_grunt", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_grunt_torso"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_grunt_torso", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_security"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_guard", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_zombie_hev"))
+                {
+                    uResourceManager.LoadModel("zombies/zombie_hev", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("prop_surgerybot"))
+                {
+                    uResourceManager.LoadModel("props_questionableethics/qe_surgery_bot_main", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("env_xen_healpool"))
+                {
+                    uResourceManager.LoadModel("props_xen/xen_healingpool_full", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("camera_satellite"))
+                {
+                    uResourceManager.LoadModel("editor/camera", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_controller"))
+                {
+                    uResourceManager.LoadModel("xenians/controller", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_crow"))
+                {
+                    uResourceManager.LoadModel("crow", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_seagull"))
+                {
+                    uResourceManager.LoadModel("seagull", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_pigeon"))
+                {
+                    uResourceManager.LoadModel("pigeon", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("nihilanth_pylon"))
+                {
+                    uResourceManager.LoadModel("props_xen/nil_pylon", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_slave_dummy"))
+                {
+                    uResourceManager.LoadModel("vortigaunt_slave", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_alien_slave"))
+                {
+                    uResourceManager.LoadModel("vortigaunt_slave", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_xort"))
+                {
+                    uResourceManager.LoadModel("vortigaunt_slave", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("npc_xenturret"))
+                {
+                    uResourceManager.LoadModel("props_xen/xen_turret", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+
+                if (Classname.Equals("npc_xentree"))
+                {
+                    uResourceManager.LoadModel("props_xen/foliage/hacker_tree", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_sniper"))
+                {
+                    uResourceManager.LoadModel("combine_soldier", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_puffballfungus"))
+                {
+                    uResourceManager.LoadModel("props_xen/xen_puffballfungus", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_plantlight_stalker"))
+                {
+                    uResourceManager.LoadModel("props_xen/xen_plantlightstalker", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+                if (Classname.Equals("npc_plantlight"))
+                {
+                    uResourceManager.LoadModel("props_xen/xen_protractinglight", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                }
+
+                if (Classname.Equals("info_player_marine"))
+                {
+                    uResourceManager.LoadModel("Player/mp_marine", uLoader.UseFullAnims,  uLoader.UseHitboxesOnModel).SetParent(transform, false);
+
+                }
+                if (Classname.Equals("info_player_scientist"))
+                {
+
+                    uResourceManager.LoadModel("Player/mp_scientist_hev", uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+
+
+                }
+
+                #endregion
+                Int32 RenderModeIndex = Data.FindIndex(n => n == "rendermode");
+                if (RenderModeIndex != -1)
+                {
+                    if (Data[RenderModeIndex + 1] == "10")
+                    {
+                        for (Int32 i = 0; i < transform.childCount; i++)
+                        {
+                            GameObject Child = transform.GetChild(i).gameObject;
+                            Child.GetComponent<Renderer>().enabled = false;
+                        }
+                    }
+                }
+
+                if (Classname.Contains("prop_") || Classname.Contains("npc_"))// || Classname.Equals("asw_door"))
+                {
+                    string ModelName = Data[Data.FindIndex(n => n == "model") + 1];
+
+                    if (!string.IsNullOrEmpty(ModelName))
+                    {
+                        uResourceManager.LoadModel(ModelName, uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                        return;
+                    }
+
+                    return;
+                }
+
+            if (Classname.Contains("generic_actor"))// || Classname.Equals("asw_door"))
+            {
+                string ModelName = Data[Data.FindIndex(n => n == "model") + 1];
+
+                if (!string.IsNullOrEmpty(ModelName))
+                {
+                    uResourceManager.LoadModel(ModelName, uLoader.UseFullAnims, uLoader.UseHitboxesOnModel).SetParent(transform, false);
+                    return;
+                }
+
+                return;
+            }
+
+            if (uLoader.ParseDecals && Classname.Equals("infodecal"))
+                {
+                    String DecalName = Data[Data.FindIndex(n => n == "texture") + 1];
+                    VMTFile DecalMaterial = uResourceManager.LoadMaterial(DecalName);
+
+                    Single DecalScale = DecalMaterial.GetSingle("$decalscale");
+
+                    if (DecalScale <= 0)
+                        DecalScale = 1f;
+
+                    Int32 DecalWidth = DecalMaterial.Material.mainTexture.width;   //X
+                    Int32 DecalHeight = DecalMaterial.Material.mainTexture.height; //Y
+                    Sprite DecalTexture = Sprite.Create((Texture2D)DecalMaterial.Material.mainTexture, new Rect(0, 0, DecalWidth, DecalHeight), Vector2.zero);
+
+                   Decal_ DecalBuilder = transform.gameObject.AddComponent<Decal_>();
+
+#if UNITY_EDITOR
+                    if (uLoader.DebugMaterials)
+                        transform.gameObject.AddComponent<DebugMaterial>().Init(DecalMaterial);
+#endif
+
+                    DecalBuilder.SetDirection();
+                    DecalBuilder.MaxAngle = 87.5f;
+                    DecalBuilder.Offset = 0.001f;
+                    DecalBuilder.Sprite = DecalTexture;
+                    DecalBuilder.Material = DecalMaterial.Material;
+                    DecalBuilder.Material.SetTextureScale("_MainTex", new Vector2(-1, 1));
+
+                    Single ScaleX = (DecalWidth * DecalScale) * uLoader.UnitScale;
+                    Single ScaleY = (DecalHeight * DecalScale) * uLoader.UnitScale;
+
+                    Single DepthSize = ScaleX;
+                    if (ScaleY < DepthSize)
+                        DepthSize = ScaleY;
+
+                    transform.localScale = new Vector3(ScaleX, ScaleY, DepthSize);
+                    transform.position += new Vector3(0, 0, 0.001f);
+
+
+
+#if !UNITY_EDITOR
+                DecalBuilder.BuildAndSetDirty();
+#endif
+                }
+            }
+        }
+    }
+

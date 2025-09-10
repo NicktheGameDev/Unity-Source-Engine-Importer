@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using ICSharpCode.SharpZipLib.Zip;
+using Unity.VisualScripting;
 using uSource.Formats.Source.VPK;
 using uSource.Formats.Source.VBSP;
 using uSource.Formats.Source.VTF;
@@ -479,57 +480,193 @@ namespace uSource
             return Model;
         }
 
-        public static VMTFile LoadMaterial(String MaterialPath)
+  public static VMTFile LoadMaterial(string MaterialPath)
+{
+    // Znormalizuj: nazwa bez "materials/" i bez rozszerzenia
+    string temp = MaterialPath.NormalizePath(MaterialsExtension[0], MaterialsSubFolder, outputWithExt: false);
+
+    // Jeśli w cache jest wpis, ale z pustym Material – odśwież go
+    if (MaterialCache != null && MaterialCache.TryGetValue(temp, out var cached))
+    {
+        if (cached != null && cached.Material != null)
+            return cached;
+
+        MaterialCache.Remove(temp); // wymuś ponowne wczytanie
+    }
+
+    string fileName = temp + MaterialsExtension[0]; // .vmt
+    VMTFile vmt;
+
+    using (Stream vmtStream = OpenFile(fileName))
+    {
+        if (vmtStream == null)
         {
-            //Normalize path before do magic here 
-            //(Cuz some paths uses different separators or levels... so we normalize paths always)
-            String TempPath = MaterialPath.NormalizePath(MaterialsExtension[0], MaterialsSubFolder, outputWithExt: false);
-
-            //If material exist in cache, return it
-            if (MaterialCache.ContainsKey(TempPath))
+            // Druga próba: gdy ktoś poda pełną ścieżkę z "materials/"
+            string alt = (MaterialsSubFolder + "/" + temp + MaterialsExtension[0]).NormalizeSlashes();
+            using (Stream vmtStream2 = OpenFile(alt))
             {
-                VMTFile VMTCache = MaterialCache[TempPath];
-
-                if (VMTCache.Material == null)
-                    VMTCache.CreateMaterial();
-
-                return VMTCache;
-            }
-            //Else begin try load & parse material
-
-            String FileName = TempPath + MaterialsExtension[0];
-            VMTFile VMTFile;
-            using (Stream vmtStream = OpenFile(FileName))
-            {
-                //If at least one material was not found, notify about that
-                if (vmtStream == null)
+                if (vmtStream2 == null)
                 {
-                    Debug.LogWarning(FileName + " NOT FOUND!");
-                    return new VMTFile(null, FileName);
+                    Debug.LogWarning(fileName + " NOT FOUND!");
+                    vmt = new VMTFile(null, fileName); // placeholder
                 }
-                //Else try load & parse material
-
-                try
+                else
                 {
-                    VMTFile = new VMTFile(vmtStream, FileName);
-
-                    if (VMTFile != null)
-                        VMTFile.CreateMaterial();
-                    else
-                        VMTFile = new VMTFile(null, FileName);
-                }
-                catch (Exception ex)
-                {
-                    //notify about error
-                    Debug.LogError(String.Format("{0}: {1}", TempPath, ex.Message));
-                    return new VMTFile(null, FileName);
+                    try { vmt = new VMTFile(vmtStream2, fileName); }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"{temp}: {ex.Message}");
+                        vmt = new VMTFile(null, fileName);
+                    }
                 }
             }
-
-            //Add material to cache (to load faster than reparse material again, again and again...)
-            MaterialCache.Add(TempPath, VMTFile);
-            return VMTFile;
         }
+        else
+        {
+            try { vmt = new VMTFile(vmtStream, fileName); }
+            catch (Exception ex)
+            {
+                Debug.LogError($"{temp}: {ex.Message}");
+                vmt = new VMTFile(null, fileName);
+            }
+        }
+    }
+
+    // ZAWSZE spróbuj stworzyć materiał
+    try
+    {
+        if (vmt != null && vmt.Material == null)
+        {
+            vmt.CreateHDRPMaterial(); // twoja istniejąca metoda
+            if (vmt.Material == null)
+            {
+                // Twardy fallback: HDRP → URP → Standard
+                var shader = Shader.Find("HDRP/Lit")
+                             ?? Shader.Find("Universal Render Pipeline/Lit")
+                             ?? Shader.Find("Standard")
+                             ?? Shader.Find("Sprites/Default");
+                var m = new Material(shader) { name = System.IO.Path.GetFileName(temp) };
+                vmt.Material = m;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Debug.LogWarning($"[uSource] Create material fallback for '{temp}': {ex.Message}");
+        var shader = Shader.Find("HDRP/Lit")
+                     ?? Shader.Find("Universal Render Pipeline/Lit")
+                     ?? Shader.Find("Standard")
+                     ?? Shader.Find("Sprites/Default");
+        var m = new Material(shader) { name = System.IO.Path.GetFileName(temp) };
+        vmt.Material = m;
+    }
+
+    // Do cache i zwrot
+    if (MaterialCache == null) MaterialCache = new Dictionary<string, VMTFile>();
+    MaterialCache[temp] = vmt;
+    return vmt;
+}
+
+
+        internal static Cubemap LoadTextureAsCube(string cubemapName)
+        {
+            if (string.IsNullOrEmpty(cubemapName))
+                return null;
+
+            // 1. Wczytaj pojedynczą teksturę (np. equirectangular)
+            Texture2D[,] loaded = LoadTexture(cubemapName);
+            Texture2D source = loaded != null ? loaded[0, 0] : null;
+
+            if (source != null)
+            {
+                Texture2D readable = EnsureTextureIsReadable(source);
+                int size = Mathf.Max(readable.width, readable.height);
+                if (size <= 0) size = 16;
+
+                // TODO: tu możesz zastąpić fallback rzeczywistą konwersją equirectangular -> cubemap
+                Cubemap fallback = new Cubemap(size, TextureFormat.RGBA32, true);
+                Color[] pixels = (readable.width == size && readable.height == size)
+                    ? readable.GetPixels()
+                    : ScaleTexture(readable, size, size).GetPixels();
+                for (int f = 0; f < 6; f++)
+                    fallback.SetPixels(pixels, (CubemapFace)f);
+                fallback.Apply(true, false);
+                return fallback;
+            }
+
+            // 2. Ostateczny fallback: czarna cubemapka, żeby nie zwracać null
+            int fallbackSize = 16;
+            Cubemap empty = new Cubemap(fallbackSize, TextureFormat.RGBA32, true);
+            Color[] black = Enumerable.Repeat(Color.black, fallbackSize * fallbackSize).ToArray();
+            for (int f = 0; f < 6; f++)
+                empty.SetPixels(black, (CubemapFace)f);
+            empty.Apply(true, false);
+            Debug.LogWarning($"[uResourceManager] Nie udało się załadować cubemapy dla '{cubemapName}', zwrócono czarny placeholder.");
+            return empty;
+        }
+
+
+        // Pomocniczo: upewnij się, że tekstura jest readable (kopiujemy przez RenderTexture jeśli nie)
+        private static Texture2D EnsureTextureIsReadable(Texture2D src)
+        {
+#if UNITY_EDITOR
+            if (src.isReadable)
+                return src;
+#endif
+            RenderTexture rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
+            Graphics.Blit(src, rt);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            Texture2D copy = new Texture2D(src.width, src.height, TextureFormat.RGBA32, true);
+            copy.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            copy.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            copy.name = src.name + "_readable_copy";
+            return copy;
+        }
+
+        // Pomocniczo: skalowanie tekstury (najprostsze nearest / bilinear)
+        private static Texture2D ScaleTexture(Texture2D src, int targetWidth, int targetHeight)
+        {
+            RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0);
+            Graphics.Blit(src, rt);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            Texture2D scaled = new Texture2D(targetWidth, targetHeight, TextureFormat.RGBA32, true);
+            scaled.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+            scaled.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            scaled.name = src.name + $"_scaled_{targetWidth}x{targetHeight}";
+            return scaled;
+        }
+
+   public static void ApplyVtaBlendShapes(UnityEngine.Mesh mesh, uSource.Formats.Source.VTA.VTAFile vta, uSource.Formats.Source.MDL.MDLFile mdl)
+        {
+            if (vta == null || mesh == null) return;
+            if (vta.VertexCount != mesh.vertexCount)
+            {
+                UnityEngine.Debug.LogWarning($"[uSource] VTA vertex count {{vta.VertexCount}} ≠ mesh {{mesh.vertexCount}}; skipping flex import.");
+                return;
+            }
+
+            var baseVerts = vta.Frames[0].Positions;
+
+            for (int f = 1; f < vta.Frames.Length; f++)
+            {
+                var frame = vta.Frames[f];
+                if (frame.Positions == null || frame.Positions.Length != mesh.vertexCount) continue;
+
+                var flexName = mdl.MDL_FlexDescs[frame.Index].ToString();
+                var deltaVerts = new UnityEngine.Vector3[mesh.vertexCount];
+                for (int v = 0; v < mesh.vertexCount; v++)
+                    deltaVerts[v] = frame.Positions[v] - baseVerts[v];
+
+                mesh.AddBlendShapeFrame(flexName, 100f, deltaVerts, null, null);
+            }
+        }
+
 
         public static Texture2D[,] LoadTexture(String TexturePath, String AltTexture = null, Boolean ImmediatelyConvert = false, String[,] ExportData = null)
         {
@@ -616,123 +753,154 @@ namespace uSource
         #endregion
 
         #region Export Manager
-        public static void ExportFromCache()
-        {
+public static void ExportFromCache()
+{
 #if UNITY_EDITOR
-            if (uLoader.DebugTime != null)
-                uLoader.DebugTime.Restart();
+    if (uLoader.DebugTime != null)
+        uLoader.DebugTime.Restart();
 
-            Int32 CurrentFile = 0;
-            Int32 TotalFiles = 0;
-            if (uLoader.GenerateUV2StaticProps)
-            {
-                TotalFiles = UV2GenerateCache.Count;
+    // ───────── UV2 dla statyk (bez zmian, ale z null-guardami) ─────────
+    if (uLoader.GenerateUV2StaticProps && UV2GenerateCache != null && UV2GenerateCache.Count > 0)
+    {
+        int total = UV2GenerateCache.Count;
+        UnityEditor.UnwrapParam unwrap;
+        UnityEditor.UnwrapParam.SetDefaults(out unwrap);
+        unwrap.hardAngle  = uLoader.UV2HardAngleProps;
+        unwrap.packMargin = uLoader.UV2PackMarginProps / uLoader.UV2PackMarginTexSize;
+        unwrap.angleError = uLoader.UV2AngleErrorProps / 100f;
+        unwrap.areaError  = uLoader.UV2AreaErrorProps  / 100f;
 
-                //Unwrap settings
-                UnityEditor.UnwrapParam UnwrapProps;
-                UnityEditor.UnwrapParam.SetDefaults(out UnwrapProps);
-                UnwrapProps.hardAngle = uLoader.UV2HardAngleProps;
-                UnwrapProps.packMargin = uLoader.UV2PackMarginProps / uLoader.UV2PackMarginTexSize;
-                UnwrapProps.angleError = uLoader.UV2AngleErrorProps / 100.0f;
-                UnwrapProps.areaError = uLoader.UV2AreaErrorProps / 100.0f;
-
-                for (Int32 MeshID = 0; MeshID < TotalFiles; MeshID++)
-                {
-                    UnityEditor.EditorUtility.DisplayProgressBar(String.Format("Generate UV2: {0}/{1}", MeshID, TotalFiles), "In Progress: " + UV2GenerateCache[MeshID].name, (float)MeshID / TotalFiles);
-                    UnityEditor.Unwrapping.GenerateSecondaryUVSet(UV2GenerateCache[MeshID], UnwrapProps);
-                }
-
-                UnityEditor.EditorUtility.ClearProgressBar();
-            }
-
-            if (uLoader.SaveAssetsToUnity)
-            {
-                CurrentFile = 0;
-                TotalFiles = MaterialCache.Count;
-                foreach (var Material in MaterialCache)
-                {
-                    UnityEditor.EditorUtility.DisplayProgressBar(String.Format("Save Materials: {0}/{1}", CurrentFile, TotalFiles), Material.Key, (float)CurrentFile / TotalFiles);
-                    String FilePath = Material.Key + ".mat";
-
-                    CurrentFile++;
-                    //TODO: EditorUtility.CopySerialized
-                    if (File.Exists(ProjectPath + FilePath))
-                        continue;
-
-                    SaveAsset(MaterialCache[Material.Key].Material, FilePath, UseReplace: false);
-                }
-
-                UnityEditor.EditorUtility.ClearProgressBar();
-
-                TotalFiles = TexExportCache.Count;
-                Boolean NeedRefresh = false;
-                for (Int32 TexID = 0; TexID < TotalFiles; TexID++)
-                {
-                    String FilePath = TexExportCache[TexID][0, 2];
-
-                    UnityEditor.EditorUtility.DisplayProgressBar(String.Format("Convert Textures: {0}/{1}", TexID, TotalFiles), FilePath, (float)TexID / TotalFiles);
-
-                    //If texture exist in cache, try convert it
-                    if (TextureCache.ContainsKey(FilePath))
-                    {
-                        String AssetPath = TexExportCache[TexID][0, 2] = FilePath + TexExportType;
-
-                        //TODO: EditorUtility.CopySerialized
-                        if (File.Exists(ProjectPath + AssetPath))
-                            continue;
-
-                        NeedRefresh = true;
-
-                        if (uLoader.ExportTextureAsPNG)
-                            SaveTexture(TextureCache[FilePath][0, 0], AssetPath, false, false);
-                        else
-                            SaveAsset(TextureCache[FilePath][0, 0], AssetPath, UseReplace: false);
-                    }
-                    else
-                        TexExportCache[TexID] = null;
-                }
-
-                UnityEditor.EditorUtility.ClearProgressBar();
-
-                //Refresh if one or more asset needs add to "Database"
-                if (NeedRefresh)
-                {
-                    UnityEditor.AssetDatabase.Refresh();
-                    UnityEditor.AssetDatabase.SaveAssets();
-                }
-
-                for (Int32 TexID = 0; TexID < TotalFiles; TexID++)
-                {
-                    if (TexExportCache[TexID] == null)
-                        continue;
-
-                    String MaterialPath = TexExportCache[TexID][0, 0];
-                    String PropertyPath = TexExportCache[TexID][0, 1];
-                    String FilePath = TexExportCache[TexID][0, 2];
-
-                    UnityEditor.EditorUtility.DisplayProgressBar("Reset textutres in materials", FilePath, (float)TexID / TotalFiles);
-
-                    Texture2D TexObj = null;
-                    if (File.Exists(ProjectPath + FilePath))
-                        TexObj = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(uSourceSavePath + FilePath);
-
-                    if (MaterialCache.ContainsKey(MaterialPath))
-                    {
-                        MaterialCache[MaterialPath].Material.SetTexture(PropertyPath, TexObj);
-                    }
-                }
-
-                UnityEditor.EditorUtility.ClearProgressBar();
-            }
-
-            if (uLoader.DebugTime != null)
-            {
-                uLoader.DebugTime.Stop();
-                uLoader.DebugTimeOutput.AppendLine("Export / Convert total time: " + uLoader.DebugTime.Elapsed);
-                Debug.Log(uLoader.DebugTimeOutput);
-            }
-#endif
+        for (int i = 0; i < total; i++)
+        {
+            var mesh = UV2GenerateCache[i];
+            if (mesh == null) continue;
+            UnityEditor.EditorUtility.DisplayProgressBar($"Generate UV2: {i}/{total}", mesh.name, (float)i / total);
+            UnityEditor.Unwrapping.GenerateSecondaryUVSet(mesh, unwrap);
         }
+        UnityEditor.EditorUtility.ClearProgressBar();
+    }
+
+    // ───────── Zapis materiałów/tekstur tylko gdy NIE są null ─────────
+    if (uLoader.SaveAssetsToUnity)
+    {
+        bool needRefresh = false;
+
+        // Materiały
+        // Materiały
+        if (MaterialCache != null && MaterialCache.Count > 0)
+        {
+            int cur = 0, total = MaterialCache.Count;
+            foreach (var kv in MaterialCache)
+            {
+                cur++;
+                string filePath = kv.Key + ".mat";
+                UnityEditor.EditorUtility.DisplayProgressBar($"Save Materials: {cur}/{total}", filePath, (float)cur / total);
+
+                var vmt = kv.Value;
+                var mat = vmt != null ? vmt.Material : null;
+
+                // jeśli nadal null – spróbuj przeładować „na świeżo” (po poprawnym providerze)
+                if (mat == null)
+                {
+                    var re = LoadMaterial(kv.Key);
+                    mat = re?.Material;
+                }
+
+                if (mat == null)
+                {
+                    Debug.LogWarning($"[uSource] Skip save NULL material (still): {kv.Key}");
+                    continue;
+                }
+
+                if (File.Exists(ProjectPath + filePath)) continue;
+
+                SaveAsset(mat, filePath, UseReplace: false);
+                needRefresh = true;
+            }
+            UnityEditor.EditorUtility.ClearProgressBar();
+        }
+
+        // Tekstury eksportowane
+        if (TexExportCache != null && TexExportCache.Count > 0)
+        {
+            int total = TexExportCache.Count;
+            for (int i = 0; i < total; i++)
+            {
+                var rec = TexExportCache[i];
+                if (rec == null) continue;
+
+                string materialPath = rec[0, 0];
+                string propPath     = rec[0, 1];
+                string key          = rec[0, 2]; // bez rozszerzenia
+
+                string assetPath = key + (uLoader.ExportTextureAsPNG ? ".png" : ".asset");
+
+                UnityEditor.EditorUtility.DisplayProgressBar($"Convert Textures: {i}/{total}", assetPath, (float)i / total);
+
+                if (!TextureCache.TryGetValue(key, out var frames) || frames == null || frames.Length == 0)
+                {
+                    Debug.LogWarning($"[uSource] Skip texture save (cache miss): {key}");
+                    continue;
+                }
+
+                var tex = frames[0, 0];
+                if (tex == null)
+                {
+                    Debug.LogWarning($"[uSource] Skip texture save (NULL): {key}");
+                    continue;
+                }
+
+                if (File.Exists(ProjectPath + assetPath))
+                    continue;
+
+                needRefresh = true;
+                if (uLoader.ExportTextureAsPNG)
+                    SaveTexture(tex, assetPath, UseReplace: false, RefreshAssets: false);
+                else
+                    SaveAsset(tex, assetPath, UseReplace: false);
+            }
+            UnityEditor.EditorUtility.ClearProgressBar();
+
+            if (needRefresh)
+            {
+                UnityEditor.AssetDatabase.SaveAssets();
+                UnityEditor.AssetDatabase.Refresh();
+            }
+
+            // Po refresh – podłącz tekstury do materiałów (jeśli są)
+            int total2 = TexExportCache.Count;
+            for (int i = 0; i < total2; i++)
+            {
+                var rec = TexExportCache[i];
+                if (rec == null) continue;
+
+                string materialPath = rec[0, 0];
+                string propPath     = rec[0, 1];
+                string key          = rec[0, 2];
+                string assetPath    = key + (uLoader.ExportTextureAsPNG ? ".png" : ".asset");
+
+                UnityEditor.EditorUtility.DisplayProgressBar("Reset textures in materials", assetPath, (float)i / total2);
+
+                Texture2D texObj = null;
+                if (File.Exists(ProjectPath + assetPath))
+                    texObj = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(uSourceSavePath + assetPath);
+
+                if (MaterialCache.TryGetValue(materialPath, out var vmt) && vmt != null && vmt.Material != null && texObj != null)
+                    vmt.Material.SetTexture(propPath, texObj);
+            }
+            UnityEditor.EditorUtility.ClearProgressBar();
+        }
+    }
+
+    if (uLoader.DebugTime != null)
+    {
+        uLoader.DebugTime.Stop();
+        uLoader.DebugTimeOutput.AppendLine("Export / Convert total time: " + uLoader.DebugTime.Elapsed);
+        Debug.Log(uLoader.DebugTimeOutput);
+    }
+#endif
+}
+
 
 #if UNITY_EDITOR
         public static T LoadAsset<T>(String FilePath, String OriginalType, String ReplaceType) where T : UnityEngine.Object
@@ -748,63 +916,76 @@ namespace uSource
         }
 
 
-        public static Texture2D SaveTexture(Texture2D Texture, String FilePath, Boolean UseReplace = true, Boolean RefreshAssets = true)
+#if UNITY_EDITOR
+        public static Texture2D SaveTexture(Texture2D texture, string filePath, bool UseReplace = true, bool RefreshAssets = true)
         {
-            if (String.IsNullOrEmpty(FilePath))
+            if (string.IsNullOrEmpty(filePath) || texture == null)
+            {
+                Debug.LogWarning($"[uResourceManager] SaveTexture skipped (path or texture NULL): '{filePath}'");
                 return null;
+            }
 
-            CreateProjectDirs(FilePath);
+            CreateProjectDirs(filePath);
 
             if (UseReplace)
-                FilePath = FilePath.Replace(MaterialsExtension[1], ".png");
+                filePath = filePath.Replace(MaterialsExtension[1], ".png");
 
-            //Flip
-            Texture2D TempTex = new Texture2D(Texture.width, Texture.height);
-            Color[] PixelsCopy = Texture.GetPixels();
-            Color[] PixelsFlipped = new Color[PixelsCopy.Length];
+            // Flip pionowy, zachowujemy
+            Texture2D tmp = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, true);
+            var src = texture.GetPixels();
+            var dst = new Color[src.Length];
+            for (int y = 0; y < texture.height; y++)
+                Array.Copy(src, y * texture.width, dst, (texture.height - 1 - y) * texture.width, texture.width);
+            tmp.SetPixels(dst);
+            tmp.Apply();
 
-            for (Int32 i = 0; i < Texture.height; i++)
-            {
-                Array.Copy(PixelsCopy, i * Texture.width, PixelsFlipped, (Texture.height - i - 1) * Texture.width, Texture.width);
-            }
-
-            TempTex.SetPixels(PixelsFlipped);
-            TempTex.Apply();
-            //UnityEngine.Object.DestroyImmediate(Texture);
-            Texture = TempTex;
-            //Flip
-
-            Byte[] TextureData = Texture.EncodeToPNG();
-            using (var File = System.IO.File.Open(ProjectPath + FilePath, FileMode.Create))
-            {
-                File.Write(TextureData, 0, TextureData.Length);
-            }
-
-            GC.Collect();
+            byte[] png = tmp.EncodeToPNG();
+            string full = ProjectPath + filePath;
+            File.WriteAllBytes(full, png);
 
             if (RefreshAssets)
             {
                 UnityEditor.AssetDatabase.Refresh();
-                return UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(uSourceSavePath + FilePath);
+                return UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(uSourceSavePath + filePath);
             }
-            else
-                return null;
+            return null;
         }
+#endif
 
-        public static void SaveAsset(UnityEngine.Object Object, String FilePath, String OriginalType = "", String ReplaceType = "", Boolean UseReplace = true)
+
+#if UNITY_EDITOR
+        public static void SaveAsset(UnityEngine.Object obj, string filePath, string originalType = "", string replaceType = "", bool UseReplace = true)
         {
-            if (String.IsNullOrEmpty(FilePath))
+            if (string.IsNullOrEmpty(filePath))
                 return;
 
-            CreateProjectDirs(FilePath);
+            if (obj == null)
+            {
+                Debug.LogWarning($"[uResourceManager] SaveAsset skipped (NULL): {filePath}");
+                return;
+            }
 
-            if (UseReplace)
-                FilePath = uSourceSavePath + FilePath.Replace(OriginalType, ReplaceType);
-            else
-                FilePath = uSourceSavePath + FilePath;
+            CreateProjectDirs(filePath);
 
-            UnityEditor.AssetDatabase.CreateAsset(Object, FilePath);
+            // Zbuduj pełną ścieżkę w obrębie projektu
+            string finalPath = UseReplace
+                ? (uSourceSavePath + filePath.Replace(originalType, replaceType)).NormalizeSlashes()
+                : (uSourceSavePath + filePath).NormalizeSlashes();
+
+            // Gwarancja unikatowej ścieżki
+            finalPath = UnityEditor.AssetDatabase.GenerateUniqueAssetPath(finalPath);
+
+            try
+            {
+                UnityEditor.AssetDatabase.CreateAsset(obj, finalPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[uResourceManager] CreateAsset failed for '{finalPath}': {ex.Message}");
+            }
         }
+#endif
+
 
         static void CreateProjectDirs(String FilePath)
         {

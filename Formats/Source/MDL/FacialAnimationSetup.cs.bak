@@ -1,0 +1,144 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+using UnityEngine;
+
+public class FacialAnimationSetup : MonoBehaviour
+{
+    // Public references for eyeballs
+    public Transform rightEye;
+    public Transform leftEye;
+
+    // Eyelid animation curves
+    private AnimationCurve upperRightLidCurve;
+    private AnimationCurve lowerRightLidCurve;
+    private AnimationCurve upperLeftLidCurve;
+    private AnimationCurve lowerLeftLidCurve;
+
+    private SkinnedMeshRenderer faceRenderer;
+
+    // Positions and values for the eyeballs
+    private Vector3 rightEyePosition = new Vector3(-1.2783f, -3.6165f, 65.0663f);
+    private Vector3 leftEyePosition = new Vector3(1.2823f, -3.6165f, 65.0642f);
+
+    private void Start()
+    {
+        // Find and assign SkinnedMeshRenderer
+        faceRenderer = GetComponent<SkinnedMeshRenderer>();
+
+        // Set eyeball positions
+        if (rightEye != null) rightEye.localPosition = rightEyePosition;
+        if (leftEye != null) leftEye.localPosition = leftEyePosition;
+
+        // Initialize eyelid curves
+        InitializeEyelidCurves();
+
+        // Attach facial animation components
+        SetupFacialAttachments();
+
+        // Load flex and animation data (flexes, blend shapes, etc.)
+        LoadFacialFlexData();
+    }
+
+    private void InitializeEyelidCurves()
+    {
+        // Define animation curves for eyelids (these are sample values)
+        upperRightLidCurve = AnimationCurve.Linear(0, -0.2275f, 1, 0.2559f);
+        lowerRightLidCurve = AnimationCurve.Linear(0, -0.2879f, 1, -0.0462f);
+        upperLeftLidCurve = AnimationCurve.Linear(0, -0.2275f, 1, 0.2559f);
+        lowerLeftLidCurve = AnimationCurve.Linear(0, -0.2879f, 1, -0.0462f);
+    }
+
+    private void SetupFacialAttachments()
+    {
+        // Setting up basic facial attachments based on Source Engine data
+        Transform head = transform.Find("ValveBiped.Bip01_Head1");
+        if (head == null) return;
+
+        // Attach points for facial features (eyes, mouth)
+        GameObject eyesAttachment = new GameObject("EyesAttachment");
+        eyesAttachment.transform.parent = head;
+        eyesAttachment.transform.localPosition = new Vector3(0.002f, -3.6165f, 65.0652f);
+        eyesAttachment.transform.localRotation = Quaternion.Euler(0, 0, 0);
+
+        GameObject mouthAttachment = new GameObject("MouthAttachment");
+        mouthAttachment.transform.parent = head;
+        mouthAttachment.transform.localPosition = new Vector3(0.1f, -5.7f, 0.0f);
+        mouthAttachment.transform.localRotation = Quaternion.Euler(0, -80, -90);
+    }
+    private List<Flex> flexes;
+
+    Stream faceRenderer_;
+    private void LoadFacialFlexData()
+    {
+        // Check if the SkinnedMeshRenderer and mesh are assigned
+        if (faceRenderer == null || faceRenderer.sharedMesh == null)
+            return;
+
+        // Initialize the flexes list
+        flexes = new List<Flex>();
+
+        // Define the root directory where game files might be located
+        // Replace with the appropriate base directory where Black Mesa or other game files are stored
+        string baseDirectory = Application.dataPath; // Adjust this path to your game's directory setup
+
+        // Define search patterns for flex data and eyeball data
+        string[] searchPatterns = new string[] { "*.mdl", "*.vvd", "*.vta" ,"*.dmx" }; // Add or adjust extensions as needed
+
+        // Recursively search for matching files in the base directory
+        foreach (var pattern in searchPatterns)
+        {
+            string[] files = Directory.GetFiles(baseDirectory, pattern, SearchOption.AllDirectories);
+
+            foreach (var filePath in files)
+            {
+                try
+                {
+                    // Open each file as a BinaryReader for reading data
+                    using (BinaryReader reader = new BinaryReader(File.OpenRead(filePath)))
+                    {
+                        while (reader.BaseStream.Position < reader.BaseStream.Length)
+                        {
+                            // Parse the flex data from the file and add to the flexes list
+                            Flex flex = Flex.FromReader(reader , 1);
+                            flexes.Add(flex);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Debug.LogWarning (removed)($"Failed to load flex data from {filePath}: {ex.Message}");
+                }
+            }
+        }
+
+        // Apply the loaded flex data to create blend shapes
+        ApplyBlendShapes(faceRenderer);
+    }
+
+    private void ApplyBlendShapes(SkinnedMeshRenderer renderer)
+    {
+        Mesh mesh = renderer.sharedMesh;
+
+        foreach (var flex in flexes)
+        {
+            // Create delta arrays for blend shapes
+            Vector3[] deltaVertices = new Vector3[mesh.vertexCount];
+            Vector3[] deltaNormals = new Vector3[mesh.vertexCount];
+            Vector3[] deltaTangents = new Vector3[mesh.vertexCount];
+
+            // Fill in delta arrays based on the flex data
+            foreach (var vertexAnim in flex.VertexAnimations)
+            {
+                int vertexIndex = vertexAnim.Index;
+                deltaVertices[vertexIndex] = vertexAnim.PositionDelta;
+                deltaNormals[vertexIndex] = vertexAnim.NormalDelta;
+               // Adjust as needed
+            }
+
+            // Add the blend shape to the mesh
+            mesh.AddBlendShapeFrame(flex.Name, 100f, deltaVertices, deltaNormals, deltaTangents);
+        }
+    }
+}

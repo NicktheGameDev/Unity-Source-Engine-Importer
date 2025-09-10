@@ -1,0 +1,44 @@
+﻿
+
+using System.IO;
+
+public enum FlexOpType
+{
+    CONST = 1,
+    FETCH1,
+    FETCH2,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    NEG,
+    EXP,
+    OPEN,
+    CLOSE,
+    COMMA,
+    MAX,
+    MIN,
+    TWO_WAY_0,
+    TWO_WAY_1,
+    NWAY,
+    COMBO,
+    DOMINATE,
+    DME_LOWER_EYELID,
+    DME_UPPER_EYELID
+}
+
+public class FlexOp
+{
+    public FlexOpType OpType { get; set; }
+    public float Value { get; set; }
+
+    public static FlexOp FromReader(BinaryReader reader)
+    {
+        FlexOp op = new FlexOp
+        {
+            OpType = (FlexOpType)reader.ReadUInt32(),
+            Value = (reader.ReadUInt32() == (uint)FlexOpType.CONST) ? reader.ReadSingle() : reader.ReadUInt32()
+        };
+        return op;
+    }
+}

@@ -6,6 +6,12 @@ using System.Reflection;
 using UnityEngine;
 using uSource.Formats.Source.VBSP;
 using uSource.Formats.Source.MDL;
+using uSource;
+using static uSource.Formats.Source.MDL.MDLFile;
+
+
+
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -25,13 +31,70 @@ namespace uSource
             window.Show();
         }
 
+        #if UNITY_EDITOR
         void OnGUI()
         {
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
             uLoaderEditor.DrawGUI();
             EditorGUILayout.EndScrollView();
         }
+        #endif
+    
+
+    private MaterialLoader materialLoader;
+
+        void Start()
+        {
+            // Initialize the appropriate material loader
+            materialLoader = new VMTMaterialLoader();
+
+            VMTLoader.VMTFile vmtFile = VMTLoader.ParseVMTFile("your_material_name");
+            if (vmtFile != null)
+            {
+                Material material = new Material(Shader.Find("Standard"));
+                materialLoader.ApplyMaterial(vmtFile, material);
+            }
+        }
     }
+
+    public class VMTMaterialLoader : MaterialLoader
+    {
+        public override void ApplyMaterial(VMTLoader.VMTFile vmtFile, Material material)
+        {
+
+            String FileName = "";
+            if (!string.IsNullOrEmpty(vmtFile.basetexture))
+            {
+                Texture2D baseTexture = uResourceManager.LoadTexture(vmtFile.basetexture, ExportData: new String[,] { { FileName, "_MainTex" } })[0, 0];
+                if (baseTexture != null)
+                {
+                    material.SetTexture("_MainTex", baseTexture);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(vmtFile.bumpmap))
+            {
+                Texture2D bumpTexture = uResourceManager.LoadTexture(vmtFile.bumpmap, ExportData: new String[,] { { FileName, "_BumpMap" } })[0, 0];
+                if (bumpTexture != null)
+                {
+                    material.SetTexture("_BumpMap", bumpTexture);
+                    material.EnableKeyword("_NORMALMAP");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(vmtFile.ssbump))
+            {
+                Texture2D ssbumpTexture = uResourceManager.LoadTexture(vmtFile.ssbump, ExportData: new String[,] { { FileName, "_SSBumpMap" } })[0, 0];
+                if (ssbumpTexture != null)
+                {
+                    material.SetTexture("_SSBumpMap", ssbumpTexture);
+                    material.EnableKeyword("_SSBUMPMAP");
+                }
+            }
+            // Apply other properties as needed...
+        }
+    }
+
 
     //TODO: Rework all this to serializable object?
     [CustomEditor(typeof(uLoader))]
@@ -158,7 +221,7 @@ namespace uSource
                     {
                         if (uLoader.LodSettingsFoldout = EditorGUILayout.Foldout(uLoader.LodSettingsFoldout, "Models LOD Settings", true, EditorStyles.miniButtonLeft))
                         {
-                            uLoader.EnableLODParsing = EditorGUILayout.ToggleLeft("Enable LOD (Beta)", uLoader.EnableLODParsing);
+                            uLoader.EnableLODParsing = EditorGUILayout.ToggleLeft("Enable LOD )", uLoader.EnableLODParsing);
 
                             if (uLoader.EnableLODParsing)
                             {
@@ -184,7 +247,7 @@ namespace uSource
                     GUILayout.EndVertical();
                     #endregion
 
-                    uLoader.LoadAnims = EditorGUILayout.ToggleLeft("Load animations (Beta)", uLoader.LoadAnims);
+                    uLoader.UseFullAnims= EditorGUILayout.ToggleLeft("Load animations", uLoader.UseFullAnims);
                     uLoader.ClearDirectoryCache = EditorGUILayout.ToggleLeft("Clear directory cache", uLoader.ClearDirectoryCache);
                     uLoader.ClearModelCache = EditorGUILayout.ToggleLeft("Clear model cache", uLoader.ClearModelCache);
                     uLoader.ClearMaterialCache = EditorGUILayout.ToggleLeft("Clear material cache", uLoader.ClearMaterialCache);
@@ -347,6 +410,10 @@ namespace uSource
                 {
                     uLoader.UseStaticPropFlag = EditorGUILayout.ToggleLeft("Load static bones", uLoader.UseStaticPropFlag);
                     uLoader.UseHitboxesOnModel = EditorGUILayout.ToggleLeft("Load hitboxes model", uLoader.UseHitboxesOnModel);
+              
+                    uLoader.UseFullAnims = EditorGUILayout.ToggleLeft("Use Full Anims", uLoader.UseFullAnims);
+
+
                     uLoader.DrawArmature = EditorGUILayout.ToggleLeft("Debug skeleton / bones", uLoader.DrawArmature);
                     uLoader.ModelPath = EditorGUILayout.TextField("Model:", uLoader.ModelPath);
                     if (GUILayout.Button("Load StudioModel", EditorStyles.toolbarButton))
@@ -356,7 +423,9 @@ namespace uSource
 
                         uLoader.Clear();
                         uResourceManager.Init();
-                        uResourceManager.LoadModel(uLoader.ModelPath, uLoader.LoadAnims, uLoader.UseHitboxesOnModel);
+                        uResourceManager.LoadModel(uLoader.ModelPath, uLoader.UseHitboxesOnModel,
+                           uLoader.UseFullAnims, uLoader.GenerateUV2StaticProps );
+                            
                         uResourceManager.ExportFromCache();
                         uResourceManager.CloseStreams();
                     }
@@ -369,14 +438,18 @@ namespace uSource
 
                         uLoader.Clear();
                         uResourceManager.Init();
-                        Transform mainMDL = uResourceManager.LoadModel(uLoader.ModelPath, uLoader.LoadAnims, uLoader.UseHitboxesOnModel);
-                        Transform subMDL = uResourceManager.LoadModel(uLoader.SubModelPath, uLoader.LoadAnims, uLoader.UseHitboxesOnModel);
+                        Transform mainMDL = uResourceManager.LoadModel(uLoader.ModelPath, uLoader.UseHitboxesOnModel,
+                           uLoader.UseFullAnims, uLoader.GenerateUV2StaticProps);
+                        if (mainMDL == null) { return; }
+                        Transform subMDL = uResourceManager.LoadModel(uLoader.ModelPath, uLoader.UseHitboxesOnModel,
+                           uLoader.UseFullAnims, uLoader.GenerateUV2StaticProps);
+                        if (subMDL == null) { return; }
                         uResourceManager.ExportFromCache();
                         uResourceManager.CloseStreams();
 
                         foreach (SkinnedMeshRenderer SkinnedMesh in subMDL.GetComponentsInChildren<SkinnedMeshRenderer>())
                             mainMDL.CreateSubModel(SkinnedMesh);
-
+                       
                         UnityEngine.Object.DestroyImmediate(subMDL.gameObject, false);
                     }
                 }
@@ -510,6 +583,8 @@ namespace uSource
         public static String RootPath = @"F:\Games\Source Engine\Counter-Strike Source";
         public static String[] ModFolders = { "cstrike", "hl2" };
         //"hl2_misc_dir", "hl2_textures_dir"
+
+        public static float WorldScale = 0.0254f;
         //"bms_maps_dir", "bms_textures_dir", "bms_materials_dir", "bms_models_dir", "bms_misc_dir"
         //"hl2_misc_dir", "hl2_textures_dir", "hl2_materials_dir", "hl2_models_dir"
         public static String[][] DirPaks = new String[][]
@@ -542,7 +617,7 @@ namespace uSource
         #endregion
         public const float inchesInMeters = 1f / 32;
         public static Single UnitScale = inchesInMeters;
-        public static Boolean LoadAnims = false;
+        public static Boolean UseFullAnims = true;  // Patched to always enable full animations
         public static Boolean ClearDirectoryCache = false;
         public static Boolean ClearModelCache = true;
         public static Boolean ClearMaterialCache = true;
@@ -594,6 +669,10 @@ namespace uSource
         public static String SubModelPath = @"weapons/ct_arms";
         public static Boolean UseStaticPropFlag = false;
         public static Boolean UseHitboxesOnModel = false;
+      
+    
+
+
         public static Boolean DrawArmature = false;
         //MDL
         #endregion
@@ -764,7 +843,7 @@ namespace uSource
             SubstractLODPrecent = PlayerPrefs.GetFloat("uSubstractLODPrecent", SubstractLODPrecent);
             #endregion
             UnitScale = PlayerPrefs.GetFloat("uUnitScale", UnitScale);//0.0254f;
-            LoadAnims = GetBool("uLoadAnims", LoadAnims);
+            UseFullAnims = GetBool("uLoadAnims", UseFullAnims);
             ClearDirectoryCache = GetBool("uClearDirectoryCache", ClearDirectoryCache);
             ClearModelCache = GetBool("uClearModelCache", ClearModelCache);
             ClearMaterialCache = GetBool("uClearMaterialCache", ClearMaterialCache);
@@ -871,7 +950,7 @@ namespace uSource
             PlayerPrefs.SetFloat("uSubstractLODPrecent", SubstractLODPrecent);
             #endregion
             PlayerPrefs.SetFloat("uUnitScale", UnitScale);
-            SetBool("uLoadAnims", LoadAnims);
+            SetBool("uLoadAnims", UseFullAnims);
             SetBool("uClearDirectoryCache", ClearDirectoryCache);
             SetBool("uClearModelCache", ClearModelCache);
             SetBool("uClearMaterialCache", ClearMaterialCache);
@@ -978,7 +1057,7 @@ namespace uSource
             SubstractLODPrecent = 0.25f;
             #endregion
             UnitScale = inchesInMeters;
-            LoadAnims = false;
+            UseFullAnims = false;
             ClearDirectoryCache = false;
             ClearModelCache = true;
             ClearMaterialCache = true;

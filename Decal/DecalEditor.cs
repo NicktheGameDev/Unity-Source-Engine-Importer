@@ -6,12 +6,12 @@ using UnityEngine;
 
 namespace uSource.Decals
 {
-    [CustomEditor(typeof(Decal))]
+    [CustomEditor(typeof(Decal_))]
     public class DecalEditor : Editor
     {
-        private Decal Target
+        private Decal_ Target
         {
-            get { return (Decal)target; }
+            get { return (Decal_)target; }
         }
 
         public override void OnInspectorGUI()

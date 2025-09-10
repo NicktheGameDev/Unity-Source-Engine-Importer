@@ -1,0 +1,46 @@
+﻿using UnityEngine;
+
+namespace uSource.Formats.Source.MDL
+{
+    // Struct to represent 2D vector (similar to Vector2D in the original code)
+    public struct Vector2D
+    {
+        public float x;
+        public float y;
+
+        public Vector2D(float x, float y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public static implicit operator Vector2(Vector2D v) => new Vector2(v.x, v.y);
+        public static implicit operator Vector2D(Vector2 v) => new Vector2D(v.x, v.y);
+    }
+
+    // Translated Vertex_t struct based on the original version
+    public struct Vertex_t
+    {
+        public Vector2D m_Position;
+        public Vector2D m_TexCoord;
+        public int origMeshVertId;
+
+        // Constructor to initialize position and texture coordinates
+        public Vertex_t(Vector2D position, Vector2D texCoord)
+        {
+            m_Position = position;
+            m_TexCoord = texCoord;
+            origMeshVertId = 0;  // Default value, can be set separately
+        }
+
+        // Overloaded constructor with default texture coordinate
+        public Vertex_t(Vector2D position) : this(position, new Vector2D(0, 0)) { }
+
+        // Init method to reset position and texture coordinates
+        public void Init(Vector2D position, Vector2D texCoord = default)
+        {
+            m_Position = position;
+            m_TexCoord = texCoord;
+        }
+    }
+}

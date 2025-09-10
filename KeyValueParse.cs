@@ -501,5 +501,123 @@ namespace uSource
         {
             return GetEnumerator();
         }
+    public class KVSection
+    {
+        public string Name { get; set; }
+        public string Value { get; set; }
+        public List<KVSection> Children { get; } = new List<KVSection>();
+
+        public KVSection() { }
+
+        public KVSection(string name, string value = "")
+        {
+            Name = name;
+            Value = value;
+        }
+    }
+
+    /// <summary>
+    /// Parser KeyValues – obsługuje zwykły tekst z kluczem i wartością,
+    /// wraz z nawiasami klamrowymi dla zagnieżdżonych sekcji.
+    /// Nie obsługuje komentarzy /* */ ani // – dla prostoty.
+    /// </summary>
+    public static class KVSerializer
+    {
+        public static KVSection Load(string path)
+        {
+            using (var reader = new StreamReader(path, Encoding.UTF8))
+                return ParseSection(reader);
+        }
+
+        private static KVSection ParseSection(StreamReader reader, string currentName = null)
+        {
+            KVSection root = new KVSection(currentName ?? "Root");
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                line = line.Trim();
+                if (line.Length == 0) continue;
+
+                // Nowa podsekcja lub para klucz-wartość
+                if (line.StartsWith("\""))
+                {
+                    // Rozbijamy na "key" "value"
+                    var parts = SplitQuoted(line);
+                    if (parts.Count >= 2)
+                    {
+                        string key = parts[0];
+                        string val = parts[1];
+
+                        // Sprawdzamy, czy zaraz po wartości jest klamra otwierająca
+                        if (line.EndsWith("{"))
+                        {
+                            // Pomijamy nawias
+                            // Klucz sekcji, wartość to zazwyczaj pusta
+                            var section = new KVSection(key);
+                            // Rekurencyjnie wczytujemy podsekcję
+                            section = ParseSection(reader, key);
+                            root.Children.Add(section);
+                        }
+                        else
+                        {
+                            // Zwykła para klucz-wartość
+                            root.Children.Add(new KVSection(key, val));
+                        }
+                    }
+                }
+                else if (line == "}")
+                {
+                    // Koniec bieżącej sekcji
+                    return root;
+                }
+                else if (line.EndsWith("{"))
+                {
+                    // Sekcja nazwana bez wartości, np. material { ... }
+                    var key = line.Substring(0, line.Length - 1).Trim();
+                    var section = ParseSection(reader, key);
+                    root.Children.Add(section);
+                }
+            }
+
+            return root;
+        }
+
+        /// <summary>
+        /// Podziel linię typu:  "key"    "value"
+        /// na listę stringów [key, value].
+        /// Obsługuje też nazwy z odstępami, np. "my key" "my value".
+        /// </summary>
+        private static List<string> SplitQuoted(string line)
+        {
+            var result = new List<string>();
+            bool inQuote = false;
+            var sb = new StringBuilder();
+
+            foreach (char c in line)
+            {
+                if (c == '"')
+                {
+                    if (inQuote)
+                    {
+                        // kończymy fragment
+                        result.Add(sb.ToString());
+                        sb.Clear();
+                        inQuote = false;
+                    }
+                    else
+                    {
+                        // zaczynamy fragment
+                        inQuote = true;
+                    }
+                }
+                else if (inQuote)
+                {
+                    sb.Append(c);
+                }
+            }
+
+            return result;
+        }
     }
 }
+    }

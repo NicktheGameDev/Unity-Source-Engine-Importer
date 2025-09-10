@@ -7,11 +7,14 @@ using ICSharpCode.SharpZipLib.Zip;
 using uSource.Formats.Source.VTF;
 using uSource.MathLib;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace uSource.Formats.Source.VBSP
 {
     public class VBSPFile : VBSPStruct
-    {
+    {private  static GameObject world; // Container for all map objects
+  // Prefab for the r
         // ======== BSP ======= //
         public static uReader BSPFileReader;
         static dheader_t BSP_Header;
@@ -48,16 +51,147 @@ namespace uSource.Formats.Source.VBSP
         // ======== ENTITIES ======= //
 
         public static Transform LightEnvironment;
-        public static Flare GlowFlare;
+        public static LensFlareDataSRP GlowFlare;
 
-        // ======== DEBUG ======= //
+        // ======
 
-        //TODO: Check if LUMPs has a LZMA compression (ex: updated tf maps)
-        public static void Load(Stream stream, string BSPName)
+        static Dictionary<string, string> ParseEntity(string entityBlock)
+        {
+            var properties = new Dictionary<string, string>();
+            MatchCollection keyValues = Regex.Matches(entityBlock, "\"([^\"]*)\"\\s*\"([^\"]*)\"");
+
+            foreach (Match kvp in keyValues)
+            {
+                properties[kvp.Groups[1].Value] = kvp.Groups[2].Value;
+            }
+
+            return properties;
+        }
+
+        static void CreateRope(Dictionary<string, string> properties)
+        {
+            if (properties.TryGetValue("start", out string start) && properties.TryGetValue("end", out string end))
+            {
+                Vector3 startPosition = ParsePosition(start);
+                Vector3 endPosition = ParsePosition(end);
+
+                GameObject ropeObject = new GameObject("Rope_" + properties["classname"]);
+                ropeObject.transform.parent = EntitiesGroup;
+
+                RopeSim ropeSim = ropeObject.AddComponent<RopeSim>();
+                ropeSim.start = CreateRopeEndpoint("StartPoint", startPosition, ropeObject.transform);
+                ropeSim.end = CreateRopeEndpoint("EndPoint", endPosition, ropeObject.transform);
+
+                LineRenderer lineRenderer = ropeObject.AddComponent<LineRenderer>();
+                lineRenderer.positionCount = 2;
+                lineRenderer.SetPosition(0, startPosition);
+                lineRenderer.SetPosition(1, endPosition);
+
+                lineRenderer.startWidth = 0.1f;
+                lineRenderer.endWidth = 0.1f;
+
+                // Load VMT material properties
+                string materialPath = properties.TryGetValue("ropeType", out string ropeType) && ropeType == "wooden"
+                    ? "cable/rope" : "cable/cable_lit";
+
+                VMTLoader.VMTFile vmtMaterial = VMTLoader.ParseVMTFile(materialPath);
+                Material ropeMaterial = new Material(Shader.Find("HDRP/Lit"));
+
+                if (vmtMaterial != null)
+                {
+                    ApplyVMTPropertiesToMaterial(vmtMaterial, ropeMaterial);
+                    lineRenderer.material = ropeMaterial;
+                }
+                else
+                {
+                    lineRenderer.material = new Material(Shader.Find("Unlit/Color")) { color = Color.black };
+                }
+
+                ropeSim.ConfigureMovementSettings(
+                    gravity: -9.81f,
+                    strength: 100f,
+                    damping: 0.05f,
+                    noise: 0.1f,
+                    windDirection: Vector3.forward,
+                    windAmount: 0.3f
+                );
+
+                Debug.Log("Rope created from " + startPosition + " to " + endPosition);
+            }
+            else
+            {
+                Debug.LogWarning("Rope entity missing start or end position data.");
+            }
+        }
+
+        static void ApplyVMTPropertiesToMaterial(VMTLoader.VMTFile vmt, Material material)
+        {
+            if (!string.IsNullOrEmpty(vmt.basetexture))
+            {
+                Texture2D baseTexture = LoadTexture(vmt.basetexture);
+                if (baseTexture != null)
+                {
+                    material.SetTexture("_MainTex", baseTexture);
+                }
+            }
+            if (vmt.alphatest) material.SetFloat("_AlphaCutoff", 0.5f);
+            if (vmt.translucent) material.SetFloat("_Mode", 3);  // Alpha blend mode
+            if (vmt.additive) material.EnableKeyword("_ADDITIVE");
+            if (vmt.envmaptint != Vector3.zero) material.SetColor("_EmissionColor", new Color(vmt.envmaptint.x, vmt.envmaptint.y, vmt.envmaptint.z));
+            material.EnableKeyword("_EMISSION");
+        }
+
+        // Helper function to load textures from the path
+        static Texture2D LoadTexture(string textureName)
+        {
+            string texturePath = "materials/" + textureName;
+            Texture2D[,] textures = uResourceManager.LoadTexture(texturePath);
+
+            if (textures != null && textures.Length > 0)
+            {
+                return textures[0, 0]; // Use the first texture
+            }
+
+            Debug.LogWarning("Texture not found at: " + texturePath);
+            return null; // Return null if no textures are found
+        }
+
+
+        static Transform CreateRopeEndpoint(string name, Vector3 position, Transform parent)
+        {
+            GameObject endpoint = new GameObject(name);
+            endpoint.transform.position = position;
+            endpoint.transform.parent = parent;
+            return endpoint.transform;
+        }
+
+        static Vector3 ParsePosition(string positionString)
+        {
+            var parts = positionString.Split(' ').Select(float.Parse).ToArray();
+            return new Vector3(parts[0], parts[1], parts[2]);
+        }
+    
+
+//TODO: Check if LUMPs has a LZMA compression (ex: updated tf maps)
+public static void Load(Stream stream, string BSPName)
         {
             BSPFileReader = new uReader(stream);
             BSPFileReader.ReadTypeFixed(ref BSP_Header, 1036);
+            string mapName = System.IO.Path.GetFileNameWithoutExtension(BSPName);
 
+            // Dynamically find or create the world GameObject based on the BSP file name
+            world = GameObject.Find(mapName) ?? new GameObject(mapName);
+
+            // Find the rope prefab dynamically by tag (set this tag in the Unity Editor)
+           
+            // Load and parse the BSP file to get entity data as a string
+            string bspEntityData = BSPFileReader_.GetEntityData(BSPName); // Assuming you have a BSPFileReader utility
+
+            // Place ropes in the world using parsed BSP data
+            
+
+            Debug.Log($"Map '{mapName}' loaded and ropes placed.");
+        
             if (BSP_Header.Ident != 0x50534256)
                 throw new FileLoadException(String.Format("{0}: File signature does not match 'VBSP'", BSPName));
 
@@ -382,7 +516,19 @@ namespace uSource.Formats.Source.VBSP
 
                     continue;
                 }
+                
+                foreach (Match match in trims)
+                {
+                    Dictionary<string, string> entityProperties = ParseEntity(match.Value);
 
+                    // Check if the entity is a rope
+                    if (entityProperties.ContainsKey("classname") &&
+                    (entityProperties["classname"] == "move_rope" || entityProperties["classname"] == "keyframe_rope"))
+                    {
+                        CreateRope(entityProperties);
+                    }
+
+                }
                 Transform EntityObject = null;
                 if (Data[0] == "model")
                 {
@@ -403,7 +549,7 @@ namespace uSource.Formats.Source.VBSP
                 }
             }
         }
-
+        
         static void CreateFaces()
         {
             BSP_CFaces = new Face[BSP_Faces.Length];
@@ -804,6 +950,9 @@ namespace uSource.Formats.Source.VBSP
         //def get_index(ind):
         //return (ind + min_index) % 4
         static int MinIndex = 0;
+
+        public static string entityData { get; private set; }
+
         static int GetDFaceIndex(int Index)
         {
             return (Index + MinIndex) % 4;
@@ -1042,77 +1191,118 @@ namespace uSource.Formats.Source.VBSP
         {
             return Mathf.Clamp((float)c * exponent * 0.5f, 0, 255) / 255.0f;
         }
-
-        static void CreateSkybox(List<String> data)
+        static void CreateSkybox(List<string> data)
         {
-            Material Material;
-            String Base = "skybox/" + data[data.FindIndex(n => n == "skyname") + 1];
-            //String LDR = Base;//.Replace("_hdr", "");
+            // 1) figure out the base name
+            string baseName = "skybox/" + data[data.FindIndex(n => n == "skyname") + 1];
+            int hdrIdx = baseName.IndexOf("_hdr", StringComparison.OrdinalIgnoreCase);
+            if (hdrIdx != -1)
+                baseName = baseName.Remove(hdrIdx, 4);
 
-            Int32 HDRIndex = Base.IndexOf("_hdr", StringComparison.Ordinal);
-            if (HDRIndex != -1)
-                Base.Remove(HDRIndex, 4);
+            // 2) try to load each face (ImmediatelyConvert = true ensures it's readable)
+            if (!TryLoadFace(baseName + "rt", out var texRt) ||
+                !TryLoadFace(baseName + "lf", out var texLf) ||
+                !TryLoadFace(baseName + "ft", out var texFt) ||
+                !TryLoadFace(baseName + "bk", out var texBk) ||
+                !TryLoadFace(baseName + "up", out var texUp) ||
+                !TryLoadFace(baseName + "dn", out var texDn))
+            {
+                Debug.LogWarning($"Skybox creation aborted: one or more faces missing for '{baseName}'.");
+                return;
+            }
 
-            String FileName = null;
+            // 3) clamp‑wrap mode
+            texRt.wrapMode = texLf.wrapMode = texFt.wrapMode =
+            texBk.wrapMode = texUp.wrapMode = texDn.wrapMode = TextureWrapMode.Clamp;
+
+            // 4) build the cubemap
+            int size = texRt.width;
+            var cube = new Cubemap(size, TextureFormat.RGBA32, false);
+            cube.SetPixels(texRt.GetPixels(), CubemapFace.PositiveX);
+            cube.SetPixels(texLf.GetPixels(), CubemapFace.NegativeX);
+            cube.SetPixels(texUp.GetPixels(), CubemapFace.PositiveY);
+            cube.SetPixels(texDn.GetPixels(), CubemapFace.NegativeY);
+            cube.SetPixels(texFt.GetPixels(), CubemapFace.PositiveZ);
+            cube.SetPixels(texBk.GetPixels(), CubemapFace.NegativeZ);
+            cube.Apply();
+
 #if UNITY_EDITOR
-            //Try load material from project (if exist)
+            // optional: save the cubemap asset
             if (uLoader.SaveAssetsToUnity)
             {
-                FileName = Base.NormalizePath(uResourceManager.MaterialsExtension[0], uResourceManager.MaterialsSubFolder);
-                RenderSettings.skybox = Material = uResourceManager.LoadAsset<Material>(FileName, uResourceManager.MaterialsExtension[0], ".mat");
-                if (Material != null)
-                    return;
+                string path = baseName.NormalizePath(
+                    uResourceManager.MaterialsExtension[0],
+                    uResourceManager.MaterialsSubFolder
+                ) + ".cubemap";
+                uResourceManager.SaveAsset(cube, path, uResourceManager.MaterialsExtension[0], ".cubemap");
             }
 #endif
 
-            String BaseUP = Base + "up";
-            String[] Sides = new[] { "_FrontTex", "_BackTex", "_LeftTex", "_RightTex", "_UpTex", "_DownTex" };
-            Material = new Material(Shader.Find("Mobile/Skybox"));
-            Material.name = Base;
+            // 5) find or create a global Volume
+            var go = GameObject.Find("Global HDRP Skybox Volume")
+                     ?? new GameObject("Global HDRP Skybox Volume");
+            var volume = go.GetComponent<Volume>() ?? go.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 0;
 
-            //Invert
-            for (int i = 0; i < 5; i++)
+            // 6) ensure we have a VolumeProfile
+            var profile = volume.sharedProfile;
+            if (profile == null)
             {
-                Vector2 TexScale = new Vector2(1, -1);
-                Vector2 TexOffset = new Vector2(0, 1);
-
-                if (uLoader.SaveAssetsToUnity && uLoader.ExportTextureAsPNG)
-                {
-                    TexScale.y = 1;
-                    TexOffset.y = 0;
-                }
-
-                Material.SetTextureScale(Sides[i], TexScale);
-                Material.SetTextureOffset(Sides[i], TexOffset);
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                volume.sharedProfile = profile;
+#if UNITY_EDITOR
+                UnityEditor./*[DISABLED: runtime-only] AssetDatabase.CreateAsset(profile, "Assets/HDRISkyProfile.asset");*/
+                AssetDatabase.SaveAssets();
+#endif
             }
 
-            Texture _FrontTex = uResourceManager.LoadTexture(Base + "rt", BaseUP, true)[0, 0];
-            _FrontTex.wrapMode = TextureWrapMode.Clamp;
-            Texture _BackTex = uResourceManager.LoadTexture(Base + "lf", BaseUP, true)[0, 0];
-            _BackTex.wrapMode = TextureWrapMode.Clamp;
-            Texture _LeftTex = uResourceManager.LoadTexture(Base + "ft", BaseUP, true)[0, 0];
-            _LeftTex.wrapMode = TextureWrapMode.Clamp;
-            Texture _RightTex = uResourceManager.LoadTexture(Base + "bk", BaseUP, true)[0, 0];
-            _RightTex.wrapMode = TextureWrapMode.Clamp;
-            Texture _UpTex = uResourceManager.LoadTexture(BaseUP, ImmediatelyConvert: true)[0, 0];
-            _UpTex.wrapMode = TextureWrapMode.Clamp;
-            Texture _DownTex = uResourceManager.LoadTexture(Base + "dn", BaseUP, true)[0, 0];
-            _DownTex.wrapMode = TextureWrapMode.Clamp;
+            // 7) add or fetch HDRISky
+            if (!profile.TryGet<HDRISky>(out var hdriSky))
+                hdriSky = profile.Add<HDRISky>(true);
 
-            Material.SetTexture(Sides[0], _FrontTex);
-            Material.SetTexture(Sides[1], _BackTex);
-            Material.SetTexture(Sides[2], _LeftTex);
-            Material.SetTexture(Sides[3], _RightTex);
-            Material.SetTexture(Sides[4], _UpTex);
-            Material.SetTexture(Sides[5], _DownTex);
+            hdriSky.hdriSky.overrideState = true;
+            hdriSky.hdriSky.value = cube;
+            hdriSky.exposure.overrideState = true;
+            hdriSky.exposure.value = 1f;
+            hdriSky.rotation.overrideState = true;
+            hdriSky.rotation.value = 0f;
 
-            RenderSettings.skybox = Material;
+            // 8) add or fetch VisualEnvironment and set to HDRI
+            if (!profile.TryGet<VisualEnvironment>(out var env))
+                env = profile.Add<VisualEnvironment>(true);
 
-#if UNITY_EDITOR
-            //Save skybox material to project (if enabled)
-            if (uLoader.SaveAssetsToUnity)
-                uResourceManager.SaveAsset(Material, FileName, uResourceManager.MaterialsExtension[0], ".mat");
-#endif
+            env.skyType.overrideState = true;
+            env.skyType.value = (int)SkyType.HDRI;
+
+            // re‑assign the profile in case we created it
+            volume.sharedProfile = profile;
+        }
+
+        /// <summary>
+        /// Attempts to load a single skybox face, reporting exactly one warning per missing file.
+        /// </summary>
+        /// <summary>
+        /// Attempts to load a skybox face texture by trying a variety of common naming conventions.
+        /// If it succeeds, returns true and sets ‘tex’. Otherwise returns false and leaves ‘tex’ as a 1×1 black.
+        /// </summary>
+        static bool TryLoadFace(string path, out Texture2D tex)
+        {
+            // first try exactly what the BSP tells you
+            tex = uResourceManager.LoadTexture(path, ImmediatelyConvert: true)[0, 0];
+            if (tex == null)
+            {
+                // if that fails, strip any duplicate suffix ("_rt_rt") → "_rt"
+                var name = Path.GetFileNameWithoutExtension(path);
+                var dir = Path.GetDirectoryName(path);
+                if (name.EndsWith("_rt_rt", StringComparison.OrdinalIgnoreCase))
+                    name = name.Substring(0, name.Length - 3);
+                var alt = Path.Combine(dir, name + Path.GetExtension(path));
+                tex = uResourceManager.LoadTexture(alt, ImmediatelyConvert: true)[0, 0];
+            }
+            if (tex == null)
+                Debug.LogWarning($"Skybox face not found: {path}");
+            return tex != null;
         }
 
         static void InitPAKLump()
@@ -1199,7 +1389,7 @@ namespace uSource.Formats.Source.VBSP
                         BSPFileReader.BaseStream.Seek(StaticPropStart + StaticPropSize, SeekOrigin.Begin);
 
                         Int64 CurrentPosition = BSPFileReader.BaseStream.Position;
-                        Transform MdlTransform = uResourceManager.LoadModel(StaticPropName, uLoader.LoadAnims, uLoader.UseHitboxesOnModel, uLoader.GenerateUV2StaticProps);
+                        Transform MdlTransform = uResourceManager.LoadModel(StaticPropName, uLoader.UseFullAnims, uLoader.UseHitboxesOnModel, uLoader.GenerateUV2StaticProps);
                         BSPFileReader.BaseStream.Position = CurrentPosition;
 
                         MdlTransform.position = m_Origin;

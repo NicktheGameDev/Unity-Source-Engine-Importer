@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../.."
+		}
+	],
+	"settings": {
+		"dotnet.defaultSolution": "BlackMesaRTX.sln",
+		"zencoder.enableRepoIndexing": true,
+		"dotnet.preferCSharpExtension": true
+	}
+}

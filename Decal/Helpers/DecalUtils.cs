@@ -12,13 +12,13 @@ namespace uSource.Decals
 
     static class DecalUtils
     {
-        public static MeshFilter[] GetAffectedObjects(Decal decal)
+        public static MeshFilter[] GetAffectedObjects(Decal_ decal)
         {
             var bounds = GetBounds(decal);
             //var isOnlyStatic = decal.gameObject.isStatic;
 
-            return GameObject.FindObjectsOfType<MeshRenderer>()
-                .Where(i => i.GetComponent<Decal>() == null) // ignore another decals
+            return GameObject.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
+                .Where(i => i.GetComponent<Decal_>() == null) // ignore another decals
                 .Where(i => i.gameObject.isStatic == true)//!isOnlyStatic)
                 .Where(i => HasLayer(decal.LayerMask, i.gameObject.layer))
                 .Where(i => bounds.Intersects(i.bounds))
@@ -29,7 +29,7 @@ namespace uSource.Decals
                 .ToArray();
         }
 
-        public static Terrain[] GetAffectedTerrains(Decal decal)
+        public static Terrain[] GetAffectedTerrains(Decal_ decal)
         {
             var bounds = GetBounds(decal);
             var isOnlyStatic = decal.gameObject.isStatic;
@@ -42,7 +42,7 @@ namespace uSource.Decals
         }
 
 
-        public static Bounds GetBounds(Decal decal)
+        public static Bounds GetBounds(Decal_ decal)
         {
             var transform = decal.transform;
             var size = transform.lossyScale;
@@ -76,7 +76,7 @@ namespace uSource.Decals
         }
 
 
-        public static void SetDirty(Decal decal)
+        public static void SetDirty(Decal_ decal)
         {
 #if UNITY_EDITOR
             if (decal.gameObject.scene.IsValid())
@@ -91,7 +91,7 @@ namespace uSource.Decals
         }
 
 
-        public static void FixRatio(Decal decal, ref Vector3 oldScale)
+        public static void FixRatio(Decal_ decal, ref Vector3 oldScale)
         {
             var transform = decal.transform;
             var rect = decal.Sprite.rect;

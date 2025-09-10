@@ -1,0 +1,50 @@
+﻿using System.Collections.Generic;
+
+public class BaseFlexController
+{
+    public List<FlexController> FlexControllers { get; private set; }
+
+    public virtual void InitializeFlexControllers()
+    {
+        FlexControllers = new List<FlexController>
+        {
+            new FlexController("lid_raiser", 0f, 1f, 0f),
+            new FlexController("lid_tightener", 0f, 1f, 0f),
+            new FlexController("lid_droop", 0f, 1f, 0f),
+            new FlexController("lid_closer", 0f, 1f, 0f),
+            new FlexController("half_closed", 0f, 1f, 0f),
+            new FlexController("blink", 0f, 1f, 0f),
+            new FlexController("inner_raiser", 0f, 1f, 0f),
+            new FlexController("outer_raiser", 0f, 1f, 0f),
+            new FlexController("lowerer", 0f, 1f, 0f),
+            new FlexController("cheek_raiser", 0f, 1f, 0f),
+            new FlexController("wrinkler", 0f, 1f, 0f),
+            new FlexController("dilator", 0f, 1f, 0f),
+            new FlexController("upper_raiser", 0f, 1f, 0f),
+            new FlexController("corner_puller", 0f, 1f, 0f),
+            new FlexController("corner_depressor", 0f, 1f, 0f),
+            new FlexController("chin_raiser", 0f, 1f, 0f),
+            new FlexController("part", 0f, 1f, 0f),
+            new FlexController("puckerer", 0f, 1f, 0f),
+            new FlexController("funneler", 0f, 1f, 0f),
+            new FlexController("stretcher", 0f, 1f, 0f),
+            new FlexController("bite", 0f, 1f, 0f),
+            new FlexController("presser", 0f, 1f, 0f),
+            new FlexController("tightener", 0f, 1f, 0f),
+            new FlexController("jaw_clencher", 0f, 1f, 0f),
+            new FlexController("jaw_drop", 0f, 1f, 0f),
+            new FlexController("mouth_drop", 0f, 1f, 0f),
+            new FlexController("smile", 0f, 1f, 0f),
+            new FlexController("lower_lip", 0f, 1f, 0f),
+            new FlexController("head_rightleft", 0f, 1f, 0f),
+            new FlexController("head_updown", 0f, 1f, 0f),
+            new FlexController("eyes_updown", 0f, 1f, 0f),
+            new FlexController("eyes_rightleft", 0f, 1f, 0f),
+            new FlexController("body_rightleft", 0f, 1f, 0f),
+            new FlexController("chest_rightleft", 0f, 1f, 0f),
+            new FlexController("head_forwardbackward", 0f, 1f, 0f),
+            new FlexController("gesture_updown", 0f, 1f, 0f),
+            new FlexController("gesture_rightleft", 0f, 1f, 0f)
+        };
+    }
+}

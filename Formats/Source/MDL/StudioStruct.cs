@@ -1,13 +1,449 @@
-﻿using UnityEngine;
+#if STUDIO_H
+#define STUDIO_H
+
+#if _WIN32
+
+
+#endif
+#pragma once
+#endif
+
+#region "basetypes.h"
+#region "mathlib/vector2d.h"
+#region "mathlib/vector.h"
+#region "mathlib/vector4d.h"
+#region "mathlib/compressed_vector.h"
+#region "tier0/dbg.h"
+#region "tier0/threadtools.h"
+#region "mathlib/mathlib.h"
+#region "utlvector.h"
+#region "utlhash.h"
+
+
+#region "localflexcontroller.h"
+#region "utlsymbol.h"
+
+#define STUDIO_ENABLE_PERF_COUNTERS
+
+#define STUDIO_SEQUENCE_ACTIVITY_LOOKUPS_ARE_SLOW 
+// If this is set to 1, then the activity->sequence mapping inside
+// the CStudioHdr will not be initialized until the first call to 
+// SelectWeightedSequence() or HaveSequenceForActivity(). If set 
+// to zero, the mapping will be initialized from CStudioHdr::Init()
+// (itself called from the constructor). 
+// As of June 4 2007, this was set to 1 because physics, among other
+// systems, extemporaneously declares CStudioHdrs inside local function
+// scopes without querying their activity/sequence mapping at all.
+#define STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE 
+
+
+#define STUDIO_VERSION		
+
+#if _XBOX
+#define MAXSTUDIOTRIANGLES		// TODO: tune this
+#define MAXSTUDIOVERTS			// TODO: tune this
+#define	MAXSTUDIOFLEXVERTS		// max number of verts that can be flexed per mesh.  TODO: tune this
+#else
+#define MAXSTUDIOTRIANGLES	
+#define MAXSTUDIOVERTS	
+#define	MAXSTUDIOFLEXVERTS	
+#endif
+#define MAXSTUDIOSKINS				// total textures
+#define MAXSTUDIOBONES				// total bones actually used
+#define MAXSTUDIOFLEXDESC		// maximum number of low level flexes (actual morph targets)
+#define MAXSTUDIOFLEXCTRL			// maximum number of flexcontrollers (input sliders)
+#define MAXSTUDIOPOSEPARAM	
+#define MAXSTUDIOBONECTRLS	
+#define MAXSTUDIOANIMBLOCKS 
+
+#define MAXSTUDIOBONEBITS			
+#define MODEL_VERTEX_FILE_ID		
+#define MODEL_VERTEX_FILE_VERSION	
+// this id (IDCV) is used once the vertex data has been compressed (see CMDLCache::CreateThinVertexes)
+#define MODEL_VERTEX_FILE_THIN_ID	
+// NOTE!!! : Changing this number also changes the vtx file format!!!!!
+#define MAX_NUM_BONES_PER_VERT 
+
+//Adrian - Remove this when we completely phase out the old event system.
+#define NEW_EVENT_STYLE 
+
+
+
+
+
+
+
+using UnityEngine;
 using System.Runtime.InteropServices;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using uSource.MathLib;
 
+using static uSource.Formats.Source.MDL.StudioStruct;
+using System.Diagnostics.SymbolStore;
+
+using uSource;
+using static uSource.Formats.Source.MDL.CStudioHdr;
+using System.Text;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using uSource.Formats.Source.MDL;
+using Debug = UnityEngine.Debug;
+
+
+//private:
+
+//public:
+
+
+internal class Program
+{
+    public static void Main(string[] args)
+    {
+      
+        mstudioposeparamdesc_t pPoseParameter(int i)
+
+        {
+            return pPoseParameter(i);
+
+
+        }
+        int GetSharedPoseParameter(int iSequence, int iLocalPose)
+        {
+
+            return GetSharedPoseParameter(iSequence, iLocalPose);
+
+
+        }
+        int numlocalposeparameters;
+        int localposeparamindex;
+        unsafe mstudioposeparamdesc_t* pLocalPoseParameter(int i)
+        {
+            if (i >= 0 && i < numlocalposeparameters)
+            {
+
+                return (mstudioposeparamdesc_t*)(((byte*)+localposeparamindex) + i);
+            }
+
+
+
+            return pLocalPoseParameter(i);
+        }
+
+
+        // Key values
+     
+       
+        int numlocalikautoplaylocks;
+        int localikautoplaylockindex;
+        unsafe global::CStudioHdr.mstudioiklock_t* pLocalIKAutoplayLock(int i)
+        {
+
+            if (i >= 0 && i < numlocalikautoplaylocks)
+            {
+
+                return (global::CStudioHdr.mstudioiklock_t*)(global::CStudioHdr.mstudioiklock_t*)(((byte*)+localikautoplaylockindex) + i);
+
+            }
+
+            return pLocalIKAutoplayLock(i);
+
+
+        }
+    
+        unsafe global::CStudioHdr.mstudioiklock_t pIKAutoplayLock(int i)
+        {
+            return pIKAutoplayLock(i);
+        }
+
+        int m_pStudioHdr;
+
+        unsafe Int32 CountAutoplaySequences(short pOut, int outCount)
+        {
+            CountAutoplaySequences(pOut, outCount);
+
+            return (int)m_pStudioHdr;
+
+        }
+        unsafe int CopyAutoplaySequences(short pOut, int outCount)
+        {
+
+
+
+            CopyAutoplaySequences(pOut, outCount);
+
+            return (int)m_pStudioHdr;
+
+
+        }
+     
+// The collision model mass that jay wanted
+     
+// external animations, models, etc.
+        int numincludemodels;
+        int includemodelindex;
+
+
+
+
+
+
+        unsafe mstudiomodelgroup_t* pModelGroup(int i)
+        {
+
+            if ((i >= 0 && i < numincludemodels))
+            {
+                {
+                    return (mstudiomodelgroup_t*)(((byte*)+includemodelindex));
+
+
+                }
+            }
+
+            return pModelGroup(i);
+
+            // implementation specific call to get a named model
+            unsafe studiohdr_t* FindModel(void** cache, char* modelname)
+            {
+
+
+                {
+
+
+
+
+
+                    // implementation specific back pointer to virtual data
+
+
+                    int unused_virtualModel = new();
+
+
+                    if (unused_virtualModel != 0)
+                    {
+
+
+                    }
+
+
+                    unsafe uSource.Formats.Source.MDL.virtualmodel_t* GetVirtualModel()
+                    {
+
+
+                        return GetVirtualModel();
+
+                    }
+
+
+                    int unused_animblockModel = new();
+                    if (unused_animblockModel != 0)
+                    {
+
+                    }
+                    int animblockindex;
+                    // for demand loaded animation blocks
+                    int szanimblocknameindex = new();
+                    if (szanimblocknameindex != 0)
+                    {
+
+                    }
+                    unsafe char pszAnimBlockName()
+                    {
+                        return pszAnimBlockName();
+                    }
+                    int numanimblocks;
+                    unsafe uSource.Formats.Source.MDL.mstudioanimblock_t* pAnimBlock(int i)
+                    {
+                        if ((i > 0 && i < numanimblocks))
+                        {
+                            return (uSource.Formats.Source.MDL.mstudioanimblock_t*)(((byte*)+animblockindex) + i);
+
+                        }
+
+                        return pAnimBlock(i);
+                    }
+
+
+
+
+                    return FindModel(cache, modelname);
+                    byte GetAnimBlock(int i)
+                    {
+
+
+
+
+
+                        int bonetablebynameindex = new();
+
+                        bonetablebynameindex = i;
+
+
+
+
+
+
+
+                        // used by tools only that don't cache, but persist mdl's peer data
+                        // engine uses virtualModel to back link to cache pointers
+
+                        int unused_pVertexBase = new();
+
+                        if (unused_pVertexBase != 0)
+                        {
+
+                        }
+
+                        int unused_pIndexBase = new();
+                        if (unused_pIndexBase != 0)
+                        {
+
+                        }
+
+                        // if STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT is set,
+                        // this value is used to calculate directional components of lighting 
+                        // on static props
+                        byte constdirectionallightdot = new();
+                        if (constdirectionallightdot != 0)
+                        {
+
+                        }
+                        // set during load of mdl data to track *desired* lod configuration (not actual)
+                        // the *actual* clamped root lod is found in studiohwdata
+                        // this is stored here as a global store to ensure the staged loading matches the rendering
+                        byte rootLOD = new();
+
+                        if (rootLOD != 0)
+                        {
+
+                        }
+
+                        // set in the mdl data to specify that lod configuration should only allow first numAllowRootLODs
+                        // to be set as root LOD:
+                        //	numAllowedRootLODs = 0	means no restriction, any lod can be set as root lod.
+                        //	numAllowedRootLODs = N	means that lod0 - lod(N-1) can be set as root lod, but not lodN or lower.
+                        byte numAllowedRootLODs = new();
+                        if (numAllowedRootLODs != 0)
+                        {
+
+
+                        }
+                        byte unused = new();
+
+
+                        if (unused != 0)
+                        {
+
+
+                        }
+                        int unused4 = new(); // zero out if version < 47
+
+                        if (unused4 != 0)
+                        {
+
+
+                        }
+                        int numflexcontrollerui;
+                        int flexcontrolleruiindex;
+
+
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                        unsafe mstudioflexcontrollerui_t pFlexControllerUI(int i)
+                        {
+
+
+                            if ((i >= 0 && i < numflexcontrollerui))
+                            {
+
+
+                                flexcontrolleruiindex = +i;
+                            }
+
+
+                            return pFlexControllerUI(i);
+
+
+                        }
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                        float flVertAnimFixedPointScale;
+
+                        StudioHDRFlags flags;
+                        float VertAnimFixedPointScale() { return (flags == StudioHDRFlags.STUDIOHDR_FLAGS_BUILT_IN_PREVIEW_MODE) ? flVertAnimFixedPointScale : 1.0f / 4096.0f; }
+
+                        flags = new();
+                        flVertAnimFixedPointScale = new();
+                        VertAnimFixedPointScale();
+
+
+
+
+
+                        return (byte)(studiohdr_t*)GetAnimBlock(i);
+                        // No copy constructors allowed
+
+                    }
+
+                }
+
+                byte* GetBoneTableSortedByName()
+                {
+                    GetBoneTableSortedByName();
+
+                    byte* m_pStudioHdr;
+                    return (byte*)m_pStudioHdr;
+                    {
+
+
+                    }
+                }
+
+            }
+        }
+    }
+}
+
+class IMaterial
+{
+
+
+
+}
+class IMesh
+{
+
+
+}
+
+
+class IMorph
+{
+
+
+}
+public struct virtualmodel_t
+{
+
+
+
+}
+public partial struct vertexFileHeader_t_
+{
+
+
+}
+public struct thinModelVertices_t
+{
+
+
+}
+
 namespace uSource.Formats.Source.MDL
 {
+
     [Flags]
     public enum StudioHDRFlags
     {
@@ -83,328 +519,449 @@ namespace uSource.Formats.Source.MDL
         STUDIOHDR_FLAGS_VERT_ANIM_FIXED_POINT_SCALE = 0x00200000,
     }
 
-    //TODO
-    public class StudioStruct
+
+    [Serializable]
+    public class AnimationBone
     {
-        public const byte VTXStripGroupTriListFlag = 0x01;
-        public const byte VTXStripGroupTriStripFlag = 0x02;
-        public const byte STUDIO_ANIM_RAWPOS = 0x01;
-        public const byte STUDIO_ANIM_RAWROT = 0x02;
-        public const byte STUDIO_ANIM_ANIMPOS = 0x04;
-        public const byte STUDIO_ANIM_ANIMROT = 0x08;
-        public const byte STUDIO_ANIM_DELTA = 0x10;
-        public const int STUDIO_ANIM_RAWROT2 = 0x20;
+        public byte Bone;
+        public byte Flags;
+        public int NumFrames;
+        public Quaternion pQuat48;
+        public Quaternion pQuat64;
+        public Vector3 pVec48;
+        public List<Vector3> FrameAngles;
+        public List<Vector3> FramePositions;
 
-        /// <summary>
-        /// sizeof = 392
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public unsafe struct studiohdr_t
+        public AnimationBone(byte bone, byte flags, int numFrames)
         {
-            public Int32 id;
-            public Int32 version;
+            Bone = bone;
+            Flags = flags;
+            NumFrames = numFrames;
+            FramePositions = new List<Vector3>();
+            FrameAngles = new List<Vector3>();
+        }
 
-            public Int32 checksum;
+        public void ToAnimationCurves(out AnimationCurve posX, out AnimationCurve posY, out AnimationCurve posZ,
+            out AnimationCurve rotX, out AnimationCurve rotY, out AnimationCurve rotZ, out AnimationCurve rotW)
+        {
+            posX = new AnimationCurve();
+            posY = new AnimationCurve();
+            posZ = new AnimationCurve();
+            rotX = new AnimationCurve();
+            rotY = new AnimationCurve();
+            rotZ = new AnimationCurve();
+            rotW = new AnimationCurve();
 
-            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 64)]
-            //public Char[] name;
-
-            private fixed byte _name[64];
-
-            public string Name
+            for (int i = 0; i < NumFrames; i++)
             {
-                get
+                float time = i / 30.0f; // Assuming 30 FPS
+
+                if (i < FramePositions.Count)
                 {
-                    fixed (byte* name = _name)
+                    Vector3 position = FramePositions[i];
+                    posX.AddKey(time, position.x);
+                    posY.AddKey(time, position.y);
+                    posZ.AddKey(time, position.z);
+                }
+
+                if (i < FrameAngles.Count)
+                {
+                    Quaternion rotation = Quaternion.Euler(FrameAngles[i]);
+                    rotation = NormalizeQuaternion(rotation);
+                    rotX.AddKey(time, rotation.x);
+                    rotY.AddKey(time, rotation.y);
+                    rotZ.AddKey(time, rotation.z);
+                    rotW.AddKey(time, rotation.w);
+                }
+            }
+        }
+
+        public void ReadData(uReader br)
+        {
+            var delta = (Flags & STUDIO_ANIM_DELTA) != 0;
+
+            // RLE rotation frames
+            if ((Flags & STUDIO_ANIM_ANIMROT) != 0)
+            {
+                long startPos = br.BaseStream.Position;
+                short[] offsets = br.ReadShortArray(3);
+                long endPos = br.BaseStream.Position;
+                var rotFrames = Enumerable.Range(0, NumFrames)
+                    .Select(_ => new float[3])
+                    .ToList();
+
+                for (int i = 0; i < 3; i++)
+                {
+                    if (offsets[i] == 0) continue;
+
+                    long target = startPos + offsets[i];
+                    if (target < 0 || target > br.BaseStream.Length)
                     {
-                        return new string((sbyte*)name);
+                        UnityEngine.Debug.LogWarning(
+                            $"[AnimationBone] Nieprawidłowy offset animacji: {target}, pomijam.");
+                        continue;
+                    }
+
+                    br.BaseStream.Position = target;
+                    short[] values = br.ReadAnimationFrameValues(NumFrames);
+                    for (int f = 0; f < values.Length; f++)
+                    {
+                        rotFrames[f][i] = values[f] + (delta && f > 0 ? values[f - 1] : 0f);
+                    }
+                }
+
+                FrameAngles.AddRange(rotFrames.Select(v => new Vector3(v[0], v[1], v[2])));
+                br.BaseStream.Position = endPos;
+            }
+
+            // RLE position frames
+            if ((Flags & STUDIO_ANIM_ANIMPOS) != 0)
+            {
+                long startPos = br.BaseStream.Position;
+                short[] offsets = br.ReadShortArray(3);
+                long endPos = br.BaseStream.Position;
+                var posFrames = Enumerable.Range(0, NumFrames)
+                    .Select(_ => new float[3])
+                    .ToList();
+
+                for (int i = 0; i < 3; i++)
+                {
+                    if (offsets[i] == 0) continue;
+
+                    long target = startPos + offsets[i];
+                    if (target < 0 || target > br.BaseStream.Length)
+                    {
+                        UnityEngine.Debug.LogWarning(
+                            $"[AnimationBone] Nieprawidłowy offset pozycji: {target}, pomijam.");
+                        continue;
+                    }
+
+                    br.BaseStream.Position = target;
+                    short[] values = br.ReadAnimationFrameValues(NumFrames);
+                    for (int f = 0; f < values.Length; f++)
+                    {
+                        posFrames[f][i] = values[f] + (delta && f > 0 ? values[f - 1] : 0f);
+                    }
+                }
+
+                FramePositions.AddRange(posFrames.Select(v => new Vector3(v[0], v[1], v[2])));
+                br.BaseStream.Position = endPos;
+            }
+
+            // Raw rotation (48-bit)
+            if ((Flags & STUDIO_ANIM_RAWROT) != 0)
+            {
+                var quat48 = new Quaternion48();
+                br.ReadTypeFixed(ref quat48, 6);
+                this.pQuat48 = quat48.quaternion;
+            }
+
+            // Raw rotation (64-bit)
+            if ((Flags & STUDIO_ANIM_RAWROT2) != 0)
+            {
+                var quat64 = new Quaternion64();
+                br.ReadTypeFixed(ref quat64, 8);
+                this.pQuat64 = quat64.quaternion;
+            }
+
+            // Raw position
+            if ((Flags & STUDIO_ANIM_RAWPOS) != 0)
+            {
+                var vec48 = new FVector48();
+                br.ReadTypeFixed(ref vec48, 6);
+                this.pVec48 = vec48.ToVector3();
+            }
+
+        }
+
+        public List<Vector3> ReadAnimationFrames(uReader br, int numFrames, bool delta, string type)
+        {
+            var startPos = br.BaseStream.Position;
+            var offsets = br.ReadShortArray(3);
+
+            if (offsets == null || offsets.Length != 3)
+                throw new InvalidDataException($"Invalid offsets array for {type} data.");
+
+            var frames = new List<float[]>();
+            for (var i = 0; i < numFrames; i++)
+                frames.Add(new float[3]);
+
+            for (var i = 0; i < 3; i++)
+            {
+                if (offsets[i] <= 0) continue;
+
+                long newPosition = startPos + offsets[i];
+                if (newPosition < 0 || newPosition >= br.BaseStream.Length)
+                    continue;
+
+                br.BaseStream.Position = newPosition;
+
+                var values = br.ReadAnimationFrameValues(numFrames);
+                if (values == null || values.Length != numFrames)
+                    continue;
+
+                for (var f = 0; f < values.Length; f++)
+                {
+                    frames[f][i] = values[f];
+                    if (f > 0 && delta)
+                    {
+                        frames[f][i] += frames[f - 1][i];
                     }
                 }
             }
 
-            public Int32 dataLength;
+            br.BaseStream.Position = startPos;
 
-            public Vector3 eyeposition;
-            public Vector3 illumposition;
-            public Vector3 hull_min;
-            public Vector3 hull_max;
-            public Vector3 view_bbmin;
-            public Vector3 view_bbmax;
-
-            public StudioHDRFlags flags;
-
-            // mstudiobone_t
-            public Int32 bone_count;
-            public Int32 bone_offset;
-
-            // mstudiobonecontroller_t
-            public Int32 bonecontroller_count;
-            public Int32 bonecontroller_offset;
-
-            // mstudiohitboxset_t
-            public Int32 hitbox_count;
-            public Int32 hitbox_offset;
-
-            // mstudioanimdesc_t
-            public Int32 localanim_count;
-            public Int32 localanim_offset;
-
-            // mstudioseqdesc_t
-            public Int32 localseq_count;
-            public Int32 localseq_offset;
-
-            public Int32 activitylistversion;
-            public Int32 eventsindexed;
-
-            // mstudiotexture_t
-            public Int32 texture_count;
-            public Int32 texture_offset;
-
-            public Int32 texturedir_count;
-            public Int32 texturedir_offset;
-
-            public Int32 skinreference_count;
-            public Int32 skinrfamily_count;
-            public Int32 skinreference_index;
-
-            // mstudiobodyparts_t
-            public Int32 bodypart_count;
-            public Int32 bodypart_offset;
-
-            // mstudioattachment_t
-            public Int32 attachment_count;
-            public Int32 attachment_offset;
-
-            public Int32 localnode_count;
-            public Int32 localnode_index;
-            public Int32 localnode_name_index;
-
-            // mstudioflexdesc_t
-            public Int32 flexdesc_count;
-            public Int32 flexdesc_index;
-
-            // mstudioflexcontroller_t
-            public Int32 flexcontroller_count;
-            public Int32 flexcontroller_index;
-
-            // mstudioflexrule_t
-            public Int32 flexrules_count;
-            public Int32 flexrules_index;
-
-            // mstudioikchain_t
-            public Int32 ikchain_count;
-            public Int32 ikchain_index;
-
-            // mstudiomouth_t
-            public Int32 mouths_count;
-            public Int32 mouths_index;
-
-            // mstudioposeparamdesc_t
-            public Int32 localposeparam_count;
-            public Int32 localposeparam_index;
-
-            public Int32 surfaceprop_index;
-
-            public Int32 keyvalue_index;
-            public Int32 keyvalue_count;
-
-            // mstudioiklock_t
-            public Int32 iklock_count;
-            public Int32 iklock_index;
-
-            public Single mass;
-            public Int32 contents;
-
-            // mstudiomodelgroup_t
-            public Int32 includemodel_count;
-            public Int32 includemodel_index;
-
-            public Int32 virtualModel;
-            // Placeholder for mutable-void*
-
-            // mstudioanimblock_t
-            public Int32 animblocks_name_index;
-            public Int32 animblocks_count;
-            public Int32 animblocks_index;
-
-            public Int32 animblockModel;
-            // Placeholder for mutable-void*
-
-            public Int32 bonetablename_index;
-
-            public Int32 vertex_base;
-            public Int32 offset_base;
-
-            // Used with $constantdirectionallight from the QC
-            // Model should have flag #13 set if enabled
-            public Byte directionaldotproduct;
-
-            public Byte rootLod;
-            // Preferred rather than clamped
-
-            // 0 means any allowed, N means Lod 0 -> (N-1)
-            public Byte numAllowedRootLods;
-
-            public Byte unused;
-            public Int32 unused2;
-
-            // mstudioflexcontrollerui_t
-            public Int32 flexcontrollerui_count;
-            public Int32 flexcontrollerui_index;
+            return frames.Select(f => new Vector3(f[0], f[1], f[2])).ToList();
         }
 
-        /// <summary>
-        /// sizeof = 216
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct mstudiobone_t
+        Quaternion NormalizeQuaternion(Quaternion q)
         {
-            public Int32 sznameindex;
-            public Int32 parent;
+            if (float.IsNaN(q.x) || float.IsNaN(q.y) || float.IsNaN(q.z) || float.IsNaN(q.w))
+                return Quaternion.identity;
 
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6)]
-            public Int32[] bonecontroller;
-
-            public Vector3 pos;
-            public Quaternion quat;
-            public Vector3 rot;
-
-            public Vector3 posscale;
-            public Vector3 rotscale;
-
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 12)]
-            public Single[] poseToBone;
-
-            public Quaternion qAlignment;
-            public Int32 flags;
-            public Int32 proctype;
-            public Int32 procindex;
-            public Int32 physicsbone;
-            public Int32 surfacepropidx;
-            public Int32 contents;
-
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
-            public Int32[] unused;
+            return Quaternion.Normalize(q);
         }
 
-        //SEQUENCE
 
-        [Serializable]
-        public struct AniInfo
+    }
+
+
+        public class StudioStruct
         {
-            public string name;
-            public mstudioanimdesc_t studioAnim;
-            public List<AnimationBone> AnimationBones;
-            public Keyframe[][] PosX;
-            public Keyframe[][] PosY;
-            public Keyframe[][] PosZ;
+            int nummouths;
 
-            public Keyframe[][] RotX;
-            public Keyframe[][] RotY;
-            public Keyframe[][] RotZ;
-            public Keyframe[][] RotW;
-        }
+            int mouthindex;
 
-        [Serializable]
-        public class AnimationBone
-        {
-            public byte Bone;
-            public byte Flags;
-            public int NumFrames;
-            public Quaternion pQuat48;
-            public Quaternion pQuat64;
-            public Vector3 pVec48;
-            public List<Vector3> FrameAngles;
-            public List<Vector3> FramePositions;
-
-            public AnimationBone(byte bone, byte flags, int numFrames)
+            unsafe mstudiomouth_t* pMouth(int i)
             {
-                Bone = bone;
-                Flags = flags;
-                NumFrames = numFrames;
-                FramePositions = new List<Vector3>();
-                FrameAngles = new List<Vector3>();
+                if (i >= 0 && i < nummouths)
+                {
+
+
+
+                }
+
+                ;
+                return (mstudiomouth_t*)(((byte*)+mouthindex) + i);
             }
 
-            public void ReadData(uReader br)
+            public enum StudioBoneProcType
             {
-                var delta = (Flags & STUDIO_ANIM_DELTA) > 0;
+                AxisInterp = 1,
+                QuatInterp = 2,
+                AimAtBone = 3,
+                AimAtAttach = 4,
+                Jiggle = 5
+            }
 
-                if ((Flags & STUDIO_ANIM_ANIMROT) > 0)
+
+
+
+
+            public const byte VTXStripGroupTriListFlag = 0x01;
+            public const byte VTXStripGroupTriStripFlag = 0x02;
+            public const byte STUDIO_ANIM_RAWPOS = 0x01;
+            public const byte STUDIO_ANIM_RAWROT = 0x02;
+            public const byte STUDIO_ANIM_ANIMPOS = 0x04;
+            public const byte STUDIO_ANIM_ANIMROT = 0x08;
+            public const byte STUDIO_ANIM_DELTA = 0x10;
+            public const int STUDIO_ANIM_RAWROT2 = 0x20;
+            public unsafe studiohdr_t* m_pStudioHdr;
+            public Rigidbody rigidbody_;
+
+
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public struct mstudiobone_t
+            {
+                public Int32 sznameindex;
+                public Int32 parent;
+
+                [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6)]
+                public Int32[] bonecontroller;
+
+                public Vector3 pos;
+                public Quaternion quat;
+                public Vector3 rot;
+
+                public Vector3 posscale;
+                public Vector3 rotscale;
+
+                [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 12)]
+                public Single[] poseToBone;
+
+                public Quaternion qAlignment;
+                public Int32 flags;
+                public Int32 proctype;
+                public Int32 procindex;
+                public Int32 physicsbone;
+                public Int32 surfacepropidx;
+                public Int32 contents;
+
+                [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+                public Int32[] unused;
+
+                public int proc_type;
+
+                public string GetName(byte[] mdlMdldata)
                 {
-                    // Why is this so painful :(
-                    // Read the per-frame data using RLE, just like GoldSource models
-                    var startPos = br.BaseStream.Position;
-                    var offsets = br.ReadShortArray(3);
-                    var endPos = br.BaseStream.Position;
-                    var rotFrames = new List<float[]>();
-                    for (var i = 0; i < NumFrames; i++) rotFrames.Add(new float[] { 0, 0, 0 });
-                    for (var i = 0; i < 3; i++)
+                    // 1) Szukamy offsetu do tekstu:
+                    //    sznameindex to przesunięcie od *początku tej struktury*,
+                    //    ale w wielu dumpach jest już skalkulowane jako
+                    //    offset od początku pliku MDL – więc najbezpieczniej
+                    //    potraktować go jako absolute offset w mdldata.
+                    int absOffset = sznameindex;
+
+                    // 2) Jeżeli offset wychodzi poza tablicę – zwróć pusty string
+                    if (absOffset < 0 || absOffset >= mdlMdldata.Length)
+                        return string.Empty;
+
+                    // 3) Znajdź pierwszy bajt 0x00 (null-terminator)
+                    int end = Array.IndexOf(mdlMdldata, (byte)0, absOffset);
+                    if (end == -1) end = mdlMdldata.Length; // brak null – bierz do końca
+
+                    int len = end - absOffset;
+                    if (len <= 0) return string.Empty;
+
+                    // 4) ASCII w MDL-ach jest zwykle 1-byte, ale UTF8
+                    //    nadal poprawnie zdekoduje zwykły ASCII.
+                    return System.Text.Encoding.UTF8.GetString(mdlMdldata, absOffset, len);
+                }
+
+            }
+
+            //SEQUENCE
+
+            [Serializable]
+            public class AniInfo
+            {
+                public string Name;
+                public int FrameCount;
+                public string category; // e.g., "Idle", "Walk", "Attack"
+                public string tag; // Additional grouping (optional)
+                public int priority; // Helps in determining importance or overrides
+
+                public string name;
+                public mstudioanimdesc_t studioAnim;
+                public List<AnimationBone> AnimationBones;
+                public Keyframe[][] PosX;
+                public Keyframe[][] PosY;
+                public Keyframe[][] PosZ;
+                public Keyframe[][] RotX;
+                public Keyframe[][] RotY;
+                public Keyframe[][] RotZ;
+                public Keyframe[][] RotW;
+
+                public AnimationClip clip { get; internal set; }
+                public Keyframe[][] ScaleY { get; set; }
+                public Keyframe[][] ScaleZ { get; set; }
+                public Keyframe[][] ScaleX { get; set; }
+
+                // Initialize keyframe arrays for each position and rotation axis
+                public void InitializeKeyframes(int numFrames, int numBones)
+                {
+                    PosX = CreateKeyframeArray(numFrames, numBones);
+                    PosY = CreateKeyframeArray(numFrames, numBones);
+                    PosZ = CreateKeyframeArray(numFrames, numBones);
+
+                    RotX = CreateKeyframeArray(numFrames, numBones);
+                    RotY = CreateKeyframeArray(numFrames, numBones);
+                    RotZ = CreateKeyframeArray(numFrames, numBones);
+                    RotW = CreateKeyframeArray(numFrames, numBones);
+                }
+
+                // Helper method to create a 2D array of Keyframes for each frame and bone
+                private Keyframe[][] CreateKeyframeArray(int numFrames, int numBones)
+                {
+                    Keyframe[][] keyframeArray = new Keyframe[numFrames][];
+
+                    for (int frame = 0; frame < numFrames; frame++)
                     {
-                        if (offsets[i] == 0) continue;
-                        br.BaseStream.Position = startPos + offsets[i];
-                        var values = br.ReadAnimationFrameValues(NumFrames);
-                        for (var f = 0; f < values.Length; f++)
+                        keyframeArray[frame] = new Keyframe[numBones];
+                        for (int bone = 0; bone < numBones; bone++)
                         {
-                            rotFrames[f][i] = +values[f];
-                            if (f > 0 && delta) rotFrames[f][i] += values[f - 1];
+                            keyframeArray[frame][bone] = new Keyframe(); // Initialize each keyframe with default values
                         }
                     }
-                    FrameAngles.AddRange(rotFrames.Select(x => new Vector3(x[0], x[1], x[2])));
-                    br.BaseStream.Position = endPos;
+
+                    return keyframeArray;
                 }
-                if ((Flags & STUDIO_ANIM_ANIMPOS) > 0)
+
+                public static implicit operator Animator(AniInfo v)
                 {
-                    // Same as above, except for the position coordinate
-                    var startPos = br.BaseStream.Position;
-                    var offsets = br.ReadShortArray(3);
-                    var endPos = br.BaseStream.Position;
-                    var posFrames = new List<float[]>();
-                    for (var i = 0; i < NumFrames; i++) posFrames.Add(new float[] { 0, 0, 0 });
-                    for (var i = 0; i < 3; i++)
+                    return new();
+                }
+                // Konstruktor z UnityEngine.Animation
+
+
+
+            }
+
+
+
+
+
+
+
+            private List<Vector3> ReadAnimationFrames(uReader br, int numFrames, bool delta, string type)
+            {
+                var startPos = br.BaseStream.Position;
+                var offsets = br.ReadShortArray(3);
+
+                if (offsets == null || offsets.Length != 3)
+                    throw new InvalidDataException($"Invalid offsets array for {type} data.");
+
+                var frames = new List<float[]>();
+                for (var i = 0; i < numFrames; i++)
+                    frames.Add(new float[3]);
+
+                for (var i = 0; i < 3; i++)
+                {
+                    if (offsets[i] <= 0) continue;
+
+                    long newPosition = startPos + offsets[i];
+                    if (newPosition < 0 || newPosition >= br.BaseStream.Length)
+                        continue;
+
+                    br.BaseStream.Position = newPosition;
+
+                    var values = br.ReadAnimationFrameValues(numFrames);
+                    if (values == null || values.Length != numFrames)
+                        continue;
+
+                    for (var f = 0; f < values.Length; f++)
                     {
-                        if (offsets[i] == 0) continue;
-                        br.BaseStream.Position = startPos + offsets[i];
-                        var values = br.ReadAnimationFrameValues(NumFrames);
-                        for (var f = 0; f < values.Length; f++)
+                        frames[f][i] = values[f];
+                        if (f > 0 && delta)
                         {
-                            posFrames[f][i] = +values[f];
-                            if (f > 0 && delta) posFrames[f][i] += values[f - 1];
+                            frames[f][i] += frames[f - 1][i];
                         }
                     }
-                    FramePositions.AddRange(posFrames.Select(x => new Vector3(x[0], x[1], x[2])));
-                    br.BaseStream.Position = endPos;
                 }
-                if ((Flags & STUDIO_ANIM_RAWROT) > 0)
-                {
-                    var quat48 = new Quaternion48();
-                    br.ReadTypeFixed(ref quat48, 6);
 
-                    this.pQuat48 = quat48.quaternion;
-                }
-                if ((Flags & STUDIO_ANIM_RAWROT2) > 0)
-                {
-                    var quat64 = new Quaternion64();
-                    br.ReadTypeFixed(ref quat64, 8);
+                br.BaseStream.Position = startPos;
 
-                    this.pQuat64 = quat64.quaternion;
-                }
-                if ((Flags & STUDIO_ANIM_RAWPOS) > 0)
-                {
-                    var vec48 = new Vector48();
-                    br.ReadTypeFixed(ref vec48, 6);
+                return frames.Select(f => new Vector3(f[0], f[1], f[2])).ToList();
+            }
 
-                    this.pVec48 = vec48.ToVector3();
-                }
+            public static Quaternion NormalizeQuaternion(Quaternion q)
+            {
+                if (float.IsNaN(q.x) || float.IsNaN(q.y) || float.IsNaN(q.z) || float.IsNaN(q.w))
+                    return Quaternion.identity;
+
+                return Quaternion.Normalize(q);
             }
         }
 
+
         [Serializable]
+
+
         public struct SeqInfo
         {
             public string name;
             public mstudioseqdesc_t seq;
-            public AniInfo ani;
+            public List<AniInfo> ani;
         }
 
         /// <summary>
@@ -417,8 +974,8 @@ namespace uSource.Formats.Source.MDL
             public Int32 baseptr;
             public Int32 sznameindex;
 
-            public Single fps;      // frames per second	
-            public Int32 flags;     // looping/non-looping flags
+            public Single fps; // frames per second	
+            public Int32 flags; // looping/non-looping flags
 
             public Int32 numframes;
 
@@ -427,13 +984,13 @@ namespace uSource.Formats.Source.MDL
             public Int32 movementindex;
 
             [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6)]
-            public Int32[] unused1;         // remove as appropriate (and zero if loading older versions)	
+            public Int32[] unused1; // remove as appropriate (and zero if loading older versions)	
 
             public Int32 animblock;
-            public Int32 animindex;  // non-zero when anim data isn't in sections
+            public Int32 animindex; // non-zero when anim data isn't in sections
 
             public Int32 numikrules;
-            public Int32 ikruleindex;   // non-zero when IK data is stored in the mdl
+            public Int32 ikruleindex; // non-zero when IK data is stored in the mdl
             public Int32 animblockikruleindex; // non-zero when IK data is stored in animblock file
 
             public Int32 numlocalhierarchy;
@@ -445,90 +1002,130 @@ namespace uSource.Formats.Source.MDL
             public Int16 zeroframespan; // frames per span
             public Int16 zeroframecount; // number of spans
             public Int32 zeroframeindex;
-            public Single zeroframestalltime;       // saved during read stalls
+            public Single zeroframestalltime; // saved during read stalls
         };
 
         // sequence descriptions
         /// <summary>
-        /// sizeof = 212
-        /// </summary>
         [Serializable]
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct mstudioseqdesc_t
         {
+            // Existing fields
             public Int32 baseptr;
-
             public Int32 szlabelindex;
-
             public Int32 szactivitynameindex;
-
-            public Int32 flags;     // looping/non-looping flags
-
-            public Int32 activity;  // initialized at loadtime to game DLL values
+            public Int32 flags;
+            public Int32 activity;
             public Int32 actweight;
 
             public Int32 numevents;
             public Int32 eventindex;
 
-            public Vector3 bbmin;       // per sequence bounding box
+            public Vector3 bbmin;
             public Vector3 bbmax;
 
             public Int32 numblends;
-
-            // Index into array of shorts which is groupsize[0] x groupsize[1] in length
             public Int32 animindexindex;
 
-            public Int32 movementindex; // [blend] float array for blended movement
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Int32 movementindex;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
             public Int32[] groupsize;
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
-            public Int32[] paramindex;  // X, Y, Z, XR, YR, ZR
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
-            public Single[] paramstart; // local (0..1) starting value
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
-            public Single[] paramend;   // local (0..1) ending value
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Int32[] paramindex;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Single[] paramstart;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Single[] paramend;
+
             public Int32 paramparent;
 
-            public Single fadeintime;       // ideal cross fate in time (0.2 default)
-            public Single fadeouttime;  // ideal cross fade out time (0.2 default)
+            public Single fadeintime;
+            public Single fadeouttime;
 
-            public Int32 localentrynode;        // transition node at entry
-            public Int32 localexitnode;     // transition node at exit
-            public Int32 nodeflags;     // transition rules
+            public Int32 localentrynode;
+            public Int32 localexitnode;
+            public Int32 nodeflags;
 
-            public Single entryphase;       // used to match entry gait
-            public Single exitphase;        // used to match exit gait
+            public Single entryphase;
+            public Single exitphase;
 
-            public Single lastframe;        // frame that should generation EndOfSequence
+            public Single lastframe;
 
-            public Int32 nextseq;       // auto advancing sequences
-            public Int32 pose;          // index of delta animation between end and nextseq
+            public Int32 nextseq;
+            public Int32 pose;
 
             public Int32 numikrules;
-
-            public Int32 numautolayers; //
+            public Int32 numautolayers;
             public Int32 autolayerindex;
 
             public Int32 weightlistindex;
-
-            // FIXME: make this 2D instead of 2x1D arrays
             public Int32 posekeyindex;
 
             public Int32 numiklocks;
             public Int32 iklockindex;
 
-            // Key values
             public Int32 keyvalueindex;
             public Int32 keyvaluesize;
 
-            public Int32 cycleposeindex;        // index of pose parameter to use as cycle index
-
+            public Int32 cycleposeindex;
             public Int32 activitymodifierindex;
             public Int32 numactivitymodifiers;
 
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 5)]
-            public Int32[] unused;      // remove/add as appropriate (grow back to 8 ints on version change!)
-        };
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)]
+            public Int32[] unused;
+
+            // Replace List<mstudioevent_t> with a fixed-size array
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 100)] // Assume max size of 100; adjust as needed
+            public mstudioevent_t[] Events;
+
+            /// <summary>
+            /// Parses events for this sequence from binary data.
+            /// </summary>
+            public void ParseEvents(byte[] data, int baseOffset)
+            {
+                if (numevents <= 0 || eventindex <= 0)
+                {
+                    Events = new mstudioevent_t[0];
+                    return;
+                }
+
+                int eventStructSize = Marshal.SizeOf<mstudioevent_t>();
+                int maxEvents = Math.Min(numevents, Events.Length);
+
+                for (int i = 0; i < maxEvents; i++)
+                {
+                    int eventOffset = baseOffset + eventindex + (i * eventStructSize);
+                    if (eventOffset + eventStructSize > data.Length)
+                        break;
+
+                    Events[i] = ByteArrayToStructure<mstudioevent_t>(data, eventOffset);
+                }
+            }
+
+
+            /// <summary>
+            /// Converts a byte array to a structure of type T.
+            /// </summary>
+            private static T ByteArrayToStructure<T>(byte[] bytes, int offset) where T : struct
+            {
+                GCHandle handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+                try
+                {
+                    IntPtr ptr = (IntPtr)(handle.AddrOfPinnedObject().ToInt64() + offset);
+                    return Marshal.PtrToStructure<T>(ptr);
+                }
+                finally
+                {
+                    handle.Free();
+                }
+            }
+        }
+
         //SEQUENCE
 
         // intersection boxes
@@ -539,10 +1136,11 @@ namespace uSource.Formats.Source.MDL
         public struct mstudiobbox_t
         {
             public Int32 bone;
-            public Int32 group;                 // intersection group
-            public Vector3 bbmin;              // bounding box
+            public Int32 group; // intersection group
+            public Vector3 bbmin; // bounding box
             public Vector3 bbmax;
-            public Int32 szhitboxnameindex;  // offset to the name of the hitbox.
+            public Int32 szhitboxnameindex; // offset to the name of the hitbox.
+
             [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
             public Int32[] unused;
         };
@@ -587,150 +1185,12 @@ namespace uSource.Formats.Source.MDL
             public StudioModel[] Models;
         }
 
-        public struct StudioModel
+
+
+        internal class ActivityToValueIdxHash
         {
-            public Boolean isBlank;
-            public mstudiomodel_t Model;
-            public Int32 NumLODs;
-            public ModelLODHeader_t[] LODData;
-            public mstudiomesh_t[] Meshes;
-            public Dictionary<Int32, List<Int32>>[] IndicesPerLod;
-            public mstudiovertex_t[][] VerticesPerLod;
         }
 
-        /// <summary>
-        /// sizeof = 16
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct mstudiobodyparts_t
-        {
-            public Int32 sznameindex;
-            public Int32 nummodels;
-            public Int32 _base;
-            public Int32 modelindex;
-        }
-
-        /// <summary>
-        /// sizeof = 148
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public unsafe struct mstudiomodel_t
-        {
-            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 64)]
-            //public Char[] name;
-            private fixed byte _name[64];
-
-            public string Name
-            {
-                get
-                {
-                    fixed (byte* name = _name)
-                    {
-                        return new string((sbyte*)name);
-                    }
-                }
-            }
-
-            public Int32 type;
-            public Single boundingradius;
-            public Int32 nummeshes;
-            public Int32 meshindex;
-
-            public Int32 numvertices;
-            public Int32 vertexindex;
-            public Int32 tangentsindex;
-
-            public Int32 numattachments;
-            public Int32 attachmentindex;
-
-            public Int32 numeyeballs;
-            public Int32 eyeballindex;
-
-            public mstudio_modelvertexdata_t vertexdata;
-
-            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
-            //public Int32[] unused;
-            private fixed int _unused[8];
-
-            public override string ToString()
-            {
-                return Name;
-            }
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct mstudio_modelvertexdata_t
-        {
-            public Int32 vertexdata;
-            public Int32 tangentdata;
-        }
-
-        // attachment
-        public struct mstudioattachment_t
-        {
-            public Int32 sznameindex;
-            public UInt16 flags;
-            public Int32 localbone;
-            //matrix3x4_t local; // attachment point
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-            public Vector3[] local;
-
-            /*
-             * localVec[0].x - localM11
-             * localVec[0].y - localM12
-             * localVec[0].z - localM13
-             * localVec[1].x - localM14
-             * localVec[1].y - localM21
-             * localVec[1].z - localM22
-             * localVec[2].x - localM23
-             * localVec[2].y - localM24
-             * localVec[2].z - localM31
-             * localVec[3].x - localM32
-             * localVec[3].y - localM33
-             * localVec[3].z - localM34
-             */
-
-            /*
-            // NOTE: Not sure this is correct row-column order.
-            public float localM11;
-            public float localM12;
-            public float localM13;
-            public float localM14;
-            public float localM21;
-            public float localM22;
-            public float localM23;
-            public float localM24;
-            public float localM31;
-            public float localM32;
-            public float localM33;
-            public float localM34;
-            */
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-            public Int32[] unused;
-        }
-
-        /// <summary>
-        /// sizeof = 116
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public unsafe struct mstudiomesh_t
-        {
-            public Int32 material;
-            public Int32 modelindex;
-            public Int32 numvertices;
-            public Int32 vertexoffset;
-            public Int32 numflexes;
-            public Int32 flexindex;
-            public Int32 materialtype;
-            public Int32 materialparam;
-            public Int32 meshid;
-            public Vector3 center;
-            public mstudio_meshvertexdata_t VertexData;
-            public fixed int _unused[8];
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct mstudio_meshvertexdata_t
         {
             public Int32 modelvertexdata;
@@ -764,6 +1224,22 @@ namespace uSource.Formats.Source.MDL
             public Int32 tangentDataStart;
         }
 
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct mstudiomodelgroup_t
+        {
+            public int labelIndex;
+            public string Label => Marshal.PtrToStringAnsi((IntPtr)((byte*)+labelIndex));
+            public int nameIndex;
+            public string Name => Marshal.PtrToStringAnsi((IntPtr)((byte*)+nameIndex));
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiomodelgrouplookup_t
+        {
+            public int modelGroup;
+            public int indexWithinGroup;
+        }
+
         /// <summary>
         /// sizeof = 12
         /// </summary>
@@ -785,6 +1261,11 @@ namespace uSource.Formats.Source.MDL
             public Vector3 m_vecPosition;
             public Vector3 m_vecNormal;
             public Vector2 m_vecTexCoord;
+
+            public static explicit operator mstudiovertex_t(int v)
+            {
+                return new();
+            }
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -825,6 +1306,18 @@ namespace uSource.Formats.Source.MDL
         /// <summary>
         /// sizeof = 8
         /// </summary>
+        public enum FlexControllerRemapType_t
+        {
+            FLEXCONTROLLER_REMAP_PASSTHRU = 0,
+            FLEXCONTROLLER_REMAP_2WAY, // Control 0 -> ramps from 1-0 from 0->0.5. Control 1 -> ramps from 0-1 from 0.5->1
+            FLEXCONTROLLER_REMAP_NWAY, // StepSize = 1 / (control count-1) Control n -> ramps from 0-1-0 from (n-1)*StepSize to n*StepSize to (n+1)*StepSize. A second control is needed to specify amount to use 
+            FLEXCONTROLLER_REMAP_EYELID
+        };
+
+
+
+
+
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct BodyPartHeader_t
         {
@@ -933,30 +1426,3612 @@ namespace uSource.Formats.Source.MDL
             public Byte[] boneID;
         }
 
-        public class VTXMesh
-        {
-            public List<Vertex_t> Points { get; private set; }
 
-            public VTXMesh()
+        public class CStudioHdr
+        {
+
+            private int numflexcontrollers;
+            private int flexcontrollerindex;
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t l)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
             {
-                Points = new List<Vertex_t>();
+                int i = 0;
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                if (numflexcontrollers == 0 || (l >= 0 && i < numflexcontrollers))
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+#pragma warning disable CS8500 // This takes 
+
+                    flexcontrollerindex = +i;
+
+                return pFlexcontroller(l);
+
+
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            }
+
+
+            // Define your CStudioHdr class members and methods here
+        }
+
+        public struct mstudioflexcontrollerui_t
+        {
+            public int sznameindex;
+            public int szindex0;
+            public int szindex1;
+            public int szindex2;
+            public FlexControllerRemapType_t remaptype;
+            public bool stereo;
+            public byte[] unused;
+
+
+            public string pszName(byte[] data)
+            {
+                if (sznameindex >= data.Length)
+                    return string.Empty; // Always check bounds
+                return System.Text.Encoding.UTF8.GetString(data, sznameindex, data.Length - sznameindex);
+            }
+
+
+            public mstudioflexcontroller_t pController(byte[] data)
+            {
+                return !stereo ? new mstudioflexcontroller_t() : new();
+            }
+
+            public string pszControllerName(byte[] data)
+            {
+                return !stereo ? pController(data).pszName : null;
+            }
+
+            public int controllerIndex(CStudioHdr cStudioHdr)
+            {
+                // Implement controllerIndex logic here
+                return -1;
+            }
+
+            public mstudioflexcontroller_t pLeftController(byte[] data)
+            {
+                return stereo ? new mstudioflexcontroller_t() : new();
+            }
+
+            public string pszLeftName(byte[] data)
+            {
+                return stereo ? pLeftController(data).pszName : null;
+            }
+
+            public int leftIndex(CStudioHdr cStudioHdr)
+            {
+                // Implement leftIndex logic here
+                return -1;
+            }
+
+            public mstudioflexcontroller_t pRightController(byte[] data)
+            {
+                return stereo ? new mstudioflexcontroller_t() : new();
+            }
+
+            public string pszRightName(byte[] data)
+            {
+                return stereo ? pRightController(data).pszName : null;
+            }
+
+            public int rightIndex(CStudioHdr cStudioHdr)
+            {
+                // Implement rightIndex logic here
+                return -1;
+            }
+
+            public mstudioflexcontroller_t pNWayValueController(byte[] data)
+            {
+                if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                {
+
+
+
+
+                }
+
+                return pNWayValueController(data);
+            }
+
+
+
+
+
+            public unsafe string pszNWayValueName(byte[] data, CStudioHdr cStudioHdr)
+            {
+
+                if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                {
+                    pNWayValueController(data);
+
+
+
+
+                }
+
+
+
+
+                return pszNWayValueName(data, cStudioHdr);
+
+            }
+
+            public unsafe int nWayValueIndex(CStudioHdr cStudioHdr, LocalFlexController_t l, byte[] data)
+            {
+                if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                {
+                    // Assuming pFlexcontroller is an accessible list or array in CStudioHdr
+                    pNWayValueController(data);
+
+                    return (int)cStudioHdr.pFlexcontroller(l);
+
+
+
+                }
+
+                return -1;
+            }
+
+
+            public int Count()
+            {
+                return (stereo ? 2 : 1) + (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY ? 1 : 0);
+            }
+
+            public mstudioflexcontroller_t pController(byte[] data, int index)
+            {
+                switch (index)
+                {
+                    case 0:
+                        return !stereo ? pController(data, szindex0) : new();
+                    case 1:
+                        return stereo ? pController(data, szindex1) : new();
+                    case 2:
+                        return remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY
+                            ? pController(data, szindex2)
+
+                            : new();
+                        ;
+                    default:
+                        return new();
+
+                }
             }
         }
 
-        public class VTXPoint
+        public struct StudioModel
         {
-            public byte[] BoneWeightIndices { get; private set; }
-            public int NumBones { get; private set; }
-            public short VertexIndex { get; private set; }
-            public byte[] BoneIDs { get; private set; }
+            public Boolean isBlank;
+            public mstudiomodel_t Model;
+            public Int32 NumLODs;
+            public ModelLODHeader_t[] LODData;
+            public mstudiomesh_t[] Meshes;
+            public Dictionary<Int32, List<Int32>>[] IndicesPerLod;
+            public mstudiovertex_t[][] VerticesPerLod;
+            public int VerticesGlobalStart;
 
-            public VTXPoint(byte[] boneWeightIndices, int numBones, short vertexIndex, byte[] boneIDs)
+            /// <summary>Tablica remap dla LOD-ów: blokami po VertCountLOD0.</summary>
+            public ushort[] LODRemap;
+
+            /// <summary>Zwraca remapkę dla danego LOD-u (0 = identity).</summary>
+            public ushort[] GetLODRemap(int lod, int vertCountLod)
             {
-                BoneWeightIndices = boneWeightIndices;
-                NumBones = numBones;
-                VertexIndex = vertexIndex;
-                BoneIDs = boneIDs;
+                if (lod == 0 || LODRemap == null || LODRemap.Length == 0) return null;
+                int slice = vertCountLod; // tyle indeksów w 1 bloku
+                int ofs = slice * lod;
+                if (ofs + slice > LODRemap.Length) return null;
+                var dst = new ushort[slice];
+                Array.Copy(LODRemap, ofs, dst, 0, slice);
+                return dst;
             }
+        }
+
+        /// <summary>
+        /// sizeof = 16
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiobodyparts_t
+        {
+            public Int32 sznameindex;
+            public Int32 nummodels;
+            public Int32 _base;
+            public Int32 modelindex;
+        }
+
+        /// <summary>
+        /// sizeof = 148
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+
+        public unsafe struct mstudiomodel_t
+        {
+            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 64)]
+            //public Char[] name;
+            private fixed byte _name[64];
+
+            public string Name
+            {
+                get
+                {
+                    fixed (byte* name = _name)
+                    {
+                        return new string((sbyte*)name);
+                    }
+                }
+            }
+
+            public Int32 type;
+            public Single boundingradius;
+            public Int32 nummeshes;
+            public Int32 meshindex;
+
+            public Int32 numvertices;
+            public Int32 vertexindex;
+            public Int32 tangentsindex;
+
+            public Int32 numattachments;
+            public Int32 attachmentindex;
+
+            public Int32 numeyeballs;
+            public Int32 eyeballindex;
+            public mstudioflexcontroller_t flexData;
+
+            public mstudio_modelvertexdata_t vertexdata;
+
+            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+            //public Int32[] unused;
+            private fixed int _unused[8];
+
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudio_modelvertexdata_t
+        {
+            public Int32 vertexdata;
+            public Int32 tangentdata;
+        }
+
+        // attachment
+        public struct mstudioattachment_t
+        {
+            public Int32 sznameindex;
+            public UInt16 flags;
+
+            public Int32 localbone;
+
+            //matrix3x4_t local; // attachment point
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            public Vector3[] local;
+
+            /*
+             * localVec[0].x - localM11
+             * localVec[0].y - localM12
+             * localVec[0].z - localM13
+             * localVec[1].x - localM14
+             * localVec[1].y - localM21
+             * localVec[1].z - localM22
+             * localVec[2].x - localM23
+             * localVec[2].y - localM24
+             * localVec[2].z - localM31
+             * localVec[3].x - localM32
+             * localVec[3].y - localM33
+             * localVec[3].z - localM34
+             */
+
+            /*
+            // NOTE: Not sure this is correct row-column order.
+            public float localM11;
+            public float localM12;
+            public float localM13;
+            public float localM14;
+            public float localM21;
+            public float localM22;
+            public float localM23;
+            public float localM24;
+            public float localM31;
+            public float localM32;
+            public float localM33;
+            public float localM34;
+            */
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Int32[] unused;
+        }
+
+        /// <summary>
+        /// sizeof = 116
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct mstudiomesh_t
+        {
+            public Int32 material;
+            public Int32 modelindex;
+            public Int32 numvertices;
+            public Int32 vertexoffset;
+            public Int32 numflexes;
+            public Int32 flexindex;
+            public Int32 materialtype;
+            public Int32 materialparam;
+            public Int32 meshid;
+            public Vector3 center;
+            public mstudio_meshvertexdata_t VertexData;
+            public fixed int _unused[8];
+            public mstudioflex_t flexes;
+
+            public IEnumerable Flexes { get; set; }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+
+        public unsafe struct mstudiobonecontroller_t
+        {
+            public Int32 bone;
+            public Int32 type;
+            public float start;
+            public float end;
+            public Int32 rest;
+            public Int32 inputfield;
+            public fixed int _unused[8];
+
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioflexdesc_t
+        {
+            public int szFACSindex;
+            public int vertanim_count; // tu było chorobliwie źle: nie szukaj w controllerach
+
+            public int vertanim_offset;
+
+            // Getter dla pszFACS, który przekształca wskaźnik char* na string
+            public string pszFACS(byte[] baseData, int baseOffset)
+            {
+                // Oblicz offset do danych tekstowych
+                int stringOffset = baseOffset + szFACSindex;
+
+                // Przekształcenie danych bajtowych na string (Null-terminated string)
+                int end = Array.IndexOf(baseData, (byte)0, stringOffset);
+                int length = (end != -1) ? end - stringOffset : baseData.Length - stringOffset;
+
+                return Encoding.UTF8.GetString(baseData, stringOffset, length);
+            }
+
+
+        }
+
+
+        [Serializable]
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct mstudioflex_t
+        {
+            /// <summary>input value</summary>
+            public int flexdesc;
+
+            /// <summary>zero</summary>
+            public float target0;
+
+            /// <summary>one</summary>
+            public float target1;
+
+            /// <summary>one</summary>
+            public float target2;
+
+            /// <summary>zero</summary>
+            public float target3;
+
+            /// <summary>how many vert-anim records follow</summary>
+            public int numverts;
+
+            /// <summary>offset (in bytes) from the start of this struct to the first vert-anim</summary>
+            public int vertindex;
+
+            /// <summary>paired flexdesc (if any)</summary>
+            public int flexpair;
+
+            /// <summary>0=normal anim, 1=wrinkle anim</summary>
+            public byte vertanimtype;
+
+            /// <summary>padding</summary>
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+            public byte[] unusedchar;
+
+            /// <summary>more padding</summary>
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+            public int[] unused;
+
+            /// <summary>
+            /// Size in bytes of each vert-anim entry,
+            /// depending on vertanimtype.
+            /// </summary>
+            public int VertAnimSizeBytes()
+            {
+                return vertanimtype == (byte)StudioVertAnimType.STUDIO_VERT_ANIM_NORMAL
+                    ? Marshal.SizeOf<mstudiovertanim_t>()
+                    : Marshal.SizeOf<mstudiovertanim_wrinkle_t>();
+            }
+
+            /// <summary>
+            /// Base pointer offset (from &amp;this) to the first vert-anim record.
+            /// You’ll still need to add the pinned‐array base address.
+            /// </summary>
+            public int BaseVertanimOffset => vertindex;
+
+            /// <summary>
+            /// Get a pointer to the iᵗʰ normal vert-anim.
+            /// Requires unsafe + pinned data.
+            /// </summary>
+            public unsafe mstudiovertanim_t* pVertanim(int i)
+            {
+                if (vertanimtype != (byte)StudioVertAnimType.STUDIO_VERT_ANIM_NORMAL)
+                    throw new InvalidOperationException("Not normal vert-anim");
+                byte* basePtr = (byte*)Unsafe.AsPointer(ref this) + vertindex;
+                return (mstudiovertanim_t*)(basePtr) + i;
+            }
+
+            /// <summary>
+            /// Get a pointer to the iᵗʰ wrinkle vert-anim.
+            /// Requires unsafe + pinned data.
+            /// </summary>
+            public unsafe mstudiovertanim_wrinkle_t* pVertanimWrinkle(int i)
+            {
+                if (vertanimtype != (byte)StudioVertAnimType.STUDIO_VERT_ANIM_WRINKLE)
+                    throw new InvalidOperationException("Not wrinkle vert-anim");
+                byte* basePtr = (byte*)Unsafe.AsPointer(ref this) + vertindex;
+                return (mstudiovertanim_wrinkle_t*)(basePtr) + i;
+            }
+        }
+
+        /// <summary>
+        /// Matches C++ enum StudioVertAnimType_t
+        /// </summary>
+        public enum StudioVertAnimType : byte
+        {
+            STUDIO_VERT_ANIM_NORMAL = 0,
+            STUDIO_VERT_ANIM_WRINKLE = 1
+        }
+
+        /// <summary>
+        /// C# mirror of the 16-bit fixed-point vertex-anim record.
+        /// </summary>
+
+
+        /// <summary>
+        /// C# mirror of the wrinkle variant (inherits the base layout).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct mstudiovertanim_wrinkle_t
+        {
+            public ushort index;
+            public byte speed;
+            public byte side;
+            public fixed short delta[3];
+            public fixed short ndelta[3];
+            public short wrinkledelta;
+        }
+
+        public struct mstudioflexcontroller_t
+        {
+            public Int32 sztypeindex;
+            public Int32 sznameindex;
+            public Int32 localToGlobal; // Remapped at load time to master list
+            public float min;
+            public float max;
+
+            // Helper properties to access string data
+            public string pszType { get; private set; }
+            public string pszName { get; private set; }
+
+            // Method to set string data
+            public void SetStrings(byte[] data, int typeOffset, int nameOffset)
+            {
+                // Assuming strings are null-terminated in the byte array
+                pszType = System.Text.Encoding.UTF8.GetString(data, typeOffset, data.Length - typeOffset);
+                pszName = System.Text.Encoding.UTF8.GetString(data, nameOffset, data.Length - nameOffset);
+            }
+
+            public static explicit operator int(mstudioflexcontroller_t v)
+            {
+                return new();
+            }
+        }
+
+
+
+
+
+        public struct MStudioVertAnim
+        {
+            public short index;
+            public byte speed;
+            public byte side;
+            public short delta;
+            public short ndelta;
+            public short wrinkleDelta;
+        }
+
+        public struct MStudioVertAnimWrinkle
+        {
+            public short index;
+            public byte speed;
+            public byte side;
+            public short wrinkleDelta;
+        }
+
+
+        public enum VertexAnimationType
+        {
+            STUDIO_VERT_ANIM_NORMAL = 0,
+            STUDIO_VERT_ANIM_WRINKLE,
+        }
+
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioboneflexdriver_t
+        {
+            public int boneIndex;
+            public int controlCount;
+            public int controlIndex;
+
+            // Using a method to handle unsafe operations more explicitly
+            public mstudioboneflexdrivercontrol_t[] GetBoneFlexDriverControls()
+            {
+                mstudioboneflexdrivercontrol_t[] controls = new mstudioboneflexdrivercontrol_t[controlCount];
+                unsafe
+                {
+                    for (int i = 0; i < controlCount; i++)
+                    {
+                        mstudioboneflexdrivercontrol_t* controlPtr =
+                            (mstudioboneflexdrivercontrol_t*)((byte*)+controlIndex +
+                                                              i * sizeof(mstudioboneflexdrivercontrol_t));
+                        controls[i] = *controlPtr;
+                    }
+                }
+
+                return controls;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioboneflexdrivercontrol_t
+        {
+            public int boneComponent;
+            public int flexControllerIndex;
+            public float min;
+            public float max;
+        }
+
+        public struct mstudiovertanim_t1
+        {
+            public short index;
+            public byte speed;
+
+            public byte side;
+
+            [StructLayout(LayoutKind.Explicit)]
+
+            public struct DeltaUnion
+            {
+                public static short delta;
+                [FieldOffset(0)] public float flDelta;
+
+                [FieldOffset(0)] public float flNDelta;
+
+
+                public static short ndelta;
+
+
+                const float flVertAnimFixedPointScale = 1.0f;
+
+
+                public void ConvertToFixed()
+                {
+
+                    flDelta = 0.0f;
+                    delta = (short)(flDelta / flVertAnimFixedPointScale);
+                    delta = (short)(flDelta / flVertAnimFixedPointScale);
+                    delta = (short)(flDelta / flVertAnimFixedPointScale);
+                    ndelta = (short)(flNDelta / flVertAnimFixedPointScale);
+
+
+                    ndelta = (short)(flNDelta / flVertAnimFixedPointScale);
+
+                    ndelta = (short)(flNDelta / flVertAnimFixedPointScale);
+
+
+
+
+
+
+
+
+
+
+
+
+
+                }
+
+                public Vector3 GetDeltaFixed(Vector3Int flVertAnimFixedPointScale)
+                {
+                    flDelta = 0.0f;
+                    return Vector3.Scale(new Vector3(delta = 0, delta = 1, delta = 2), flVertAnimFixedPointScale);
+                }
+
+
+                public Vector3 GetNDeltaFixed(Vector3Int flVertAnimFixedPointScale)
+                {
+
+                    flNDelta = 0.0f;
+                    return Vector3.Scale(new Vector3(ndelta = 0, ndelta = 1, ndelta = 2), flVertAnimFixedPointScale);
+
+                }
+
+                public unsafe void GetDeltaFixed4DAlingned(Vector4* vFillin, float flVertAnimFixedPointScale)
+                {
+                    flDelta = 0.0f;
+
+                    vFillin->Set(delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale,
+                        delta * flVertAnimFixedPointScale, 0.0f);
+
+                }
+
+                public unsafe void GetNDeltaFixed4DAlingned(Vector4* vFillin, float flVertAnimFixedPointScale)
+                {
+                    flDelta = 0.0f;
+                    vFillin->Set(delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale,
+                        delta * flVertAnimFixedPointScale, 0.0f);
+
+                }
+
+                public Vector3 GetDeltaFloat()
+                {
+                    flDelta = 0.0f;
+                    return new Vector3(flDelta = 0, flDelta = 1, flDelta = 2);
+
+                }
+
+                public Vector3 GetNDeltaFloat()
+                {
+                    flNDelta = 0.0f;
+                    return new Vector3(flNDelta = 0, flNDelta = 1, flNDelta = 2);
+
+                }
+
+                public void SetNDeltaFixed(Vector3 vInput, float flVertAnimFixedPointScale)
+                {
+
+                    ndelta = (short)(vInput.x / flVertAnimFixedPointScale);
+                    ndelta = (short)(vInput.y / flVertAnimFixedPointScale);
+                    ndelta = (short)(vInput.z / flVertAnimFixedPointScale);
+                }
+
+                public void SetDeltaFixed(Vector3 vInput, float flVertAnimFixedPointScale)
+                {
+
+                    delta = (short)(vInput.x / flVertAnimFixedPointScale);
+                    delta = (short)(vInput.y / flVertAnimFixedPointScale);
+                    delta = (short)(vInput.z / flVertAnimFixedPointScale);
+                }
+
+                public void SetDeltaFloat(Vector3 vInputNormal)
+                {
+                    flDelta = vInputNormal.x;
+                    flDelta = vInputNormal.y;
+                    flDelta = vInputNormal.z;
+
+
+                }
+
+                public void SetNDeltaFloat(Vector3 vInputNormal)
+                {
+                    flNDelta = vInputNormal.x;
+                    flNDelta = vInputNormal.y;
+                    flNDelta = vInputNormal.z;
+
+
+                }
+
+
+
+
+                [StructLayout(LayoutKind.Sequential, Pack = 1)]
+                public struct mstudioaimatbone_t
+                {
+                    public int parent;
+                    public int aim;
+                    public Vector3 aimvector;
+                    public Vector3 upvector;
+                    public Vector3 basepos;
+                }
+
+                [StructLayout(LayoutKind.Sequential, Pack = 1)]
+                public unsafe struct mstudiolinearbone_t
+                {
+                    public int numbones;
+                    public int flagsindex;
+                    public int flags(int i) => *((int*)((byte*)+flagsindex) + i);
+                }
+
+
+
+                public enum flexOptype
+                {
+                    CONST = 1,
+                    FETCH1 = 2,
+                    FETCH2 = 3,
+                    ADD = 4,
+                    SUB = 5,
+                    MUL = 6,
+                    DIV = 7,
+                    NEG = 8,
+                    EXP = 9,
+                    OPEN = 10,
+                    CLOSE = 11,
+                    COMMA = 12,
+                    MAX = 13,
+                    MIN = 14,
+                    TWO_WAY_0 = 15,
+                    TWO_WAY_1 = 16,
+                    NWAY = 17,
+                    COMBO = 18,
+                    DOMINATE = 19,
+                    DME_LOWER_EYELID = 20,
+                    DME_UPPER_EYELID = 21,
+
+                }
+
+
+                public struct mstudioflexop_t
+                {
+                    public flexOptype op;
+
+                    public float value;
+
+
+
+                    public static mstudioflexop_t FromBuffer(BinaryReader buffer, int version)
+                    {
+
+
+
+                        mstudioflexop_t op = new mstudioflexop_t();
+
+
+                        op.value = version;
+                        op.op = (flexOptype)buffer.ReadUInt32();
+                        if (op.op == flexOptype.CONST)
+
+
+
+                            op.value = buffer.ReadSingle();
+
+                        else
+
+                            op.value = buffer.ReadInt32();
+
+                        return op;
+                    }
+
+
+                    public override string ToString()
+                    {
+                        return $"FlexOP({op}){(value)}";
+                    }
+                }
+
+
+
+                unsafe struct vertexFileHeader_t___
+
+                {
+
+                    int id; // MODEL_VERTEX_FILE_ID
+                    int version; // MODEL_VERTEX_FILE_VERSION
+                    int checksum; // same as studiohdr_t, ensures sync
+                    int numLODs; // num of valid lods
+                    fixed int numLODVertexes[3]; // num verts for desired root lod
+                    int numFixups; // num of vertexFileFixup_t
+                    int fixupTableStart; // offset from base to fixup table
+                    int vertexDataStart; // offset from base to vertex block
+                    int tangentDataStart; // offset from base to tangent block
+
+
+
+                    public class VTXMesh
+                    {
+                        public List<Vertex_t> Points { get; private set; }
+
+                        public VTXMesh()
+                        {
+                            Points = new List<Vertex_t>();
+                        }
+                    }
+
+                    public class VTXPoint
+                    {
+                        public byte[] BoneWeightIndices { get; private set; }
+                        public int NumBones { get; private set; }
+                        public short VertexIndex { get; private set; }
+                        public byte[] BoneIDs { get; private set; }
+
+                        public VTXPoint(byte[] boneWeightIndices, int numBones, short vertexIndex, byte[] boneIDs)
+                        {
+                            BoneWeightIndices = boneWeightIndices;
+                            NumBones = numBones;
+                            VertexIndex = vertexIndex;
+                            BoneIDs = boneIDs;
+                        }
+                    }
+
+
+                }
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiojigglebone_t
+        {
+            public int flags; // Configuration flags for the jiggle bone
+
+            // General parameters
+            public float length; // Distance from the bone base to the tip
+            public float tipMass; // Mass of the tip for physics calculations
+
+            // Flexible parameters
+            public float yawStiffness; // Resistance to yaw motion
+            public float yawDamping; // Damping for yaw motion
+            public float pitchStiffness; // Resistance to pitch motion
+            public float pitchDamping; // Damping for pitch motion
+            public float alongStiffness; // Stiffness along the bone's length
+            public float alongDamping; // Damping along the bone's length
+
+            // Angle constraint
+            public float angleLimit; // Maximum deflection angle of the tip in radians
+
+            // Yaw constraints
+            public Vector3 minYaw; // Minimum yaw angle in radians
+            public Vector3 maxYaw; // Maximum yaw angle in radians
+            public float yawFriction; // Friction applied to yaw motion
+            public float yawBounce; // Bounce effect in yaw motion
+
+            // Pitch constraints
+            public float minPitch; // Minimum pitch angle in radians
+            public float maxPitch; // Maximum pitch angle in radians
+            public float pitchFriction; // Friction applied to pitch motion
+            public float pitchBounce; // Bounce effect in pitch motion
+
+            // Base spring parameters
+            public float baseMass; // Mass at the base of the bone
+            public float baseStiffness; // Stiffness of the base spring
+            public float baseDamping; // Damping of the base spring
+            public float baseMinLeft; // Minimum leftward deflection
+            public float baseMaxLeft; // Maximum leftward deflection
+            public float baseLeftFriction; // Friction for leftward movement
+            public float baseMinUp; // Minimum upward deflection
+            public float baseMaxUp; // Maximum upward deflection
+            public float baseUpFriction; // Friction for upward movement
+            public float baseMinForward; // Minimum forward deflection
+            public float baseMaxForward; // Maximum forward deflection
+            public float baseForwardFriction; // Friction for forward movement
+
+            // Boing effect parameters
+            public float boingImpactSpeed; // Speed threshold for boing effect activation
+            public float boingImpactAngle; // Angle threshold for boing effect activation
+            public float boingDampingRate; // Damping rate for boing motion
+            public float boingFrequency; // Frequency of the boing oscillation
+            public float boingAmplitude; // Amplitude of the boing oscillation
+
+            // Bone identification
+            public int bone; // Index of the bone associated with this jiggle bone
+            internal float Stiffness;
+            internal string boneName;
+        }
+
+        /// <summary>
+        /// 
+        /// 
+        /// 
+        /// 
+        /// 
+        /// sizeof = 392
+        /// 
+        /// 
+        /// 
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct studiohdr_t
+        {
+            public Int32 id;
+            public Int32 version;
+
+            public Int32 checksum;
+
+            //[MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 64)]
+            //public Char[] name;
+
+            private fixed byte _name[64];
+
+            public string Name
+            {
+                get
+                {
+                    fixed (byte* name = _name)
+                    {
+                        return new string((sbyte*)name);
+                    }
+                }
+
+            }
+
+            public Int32 dataLength;
+
+            public Vector3 eyeposition;
+            public Vector3 illumposition;
+            public Vector3 hull_min;
+            public Vector3 hull_max;
+            public Vector3 view_bbmin;
+            public Vector3 view_bbmax;
+
+            public StudioHDRFlags flags;
+
+            // mstudiobone_t
+            public Int32 bone_count;
+            public Int32 bone_offset;
+
+            // mstudiobonecontroller_t
+            public Int32 bonecontroller_count;
+            public Int32 bonecontroller_offset;
+
+            // mstudiohitboxset_t
+            public Int32 hitbox_count;
+            public Int32 hitbox_offset;
+
+            // mstudioanimdesc_t
+            public Int32 localanim_count;
+            public Int32 localanim_offset;
+
+            // mstudioseqdesc_t
+            public Int32 localseq_count;
+            public Int32 localseq_offset;
+
+            public Int32 activitylistversion;
+            public Int32 eventsindexed;
+
+            // mstudiotexture_t
+            public Int32 texture_count;
+            public Int32 texture_offset;
+
+            public Int32 texturedir_count;
+            public Int32 texturedir_offset;
+
+            public Int32 skinreference_count;
+            public Int32 skinrfamily_count;
+            public Int32 skinreference_index;
+
+            // mstudiobodyparts_t
+            public Int32 bodypart_count;
+            public Int32 bodypart_offset;
+
+            // mstudioattachment_t
+            public Int32 attachment_count;
+            public Int32 attachment_offset;
+
+            public Int32 localnode_count;
+            public Int32 localnode_index;
+            public Int32 localnode_name_index;
+
+            // mstudioflexdesc_t
+            public Int32 flexdesc_count;
+            public Int32 flexdesc_index;
+
+            // mstudioflexcontroller_t
+            public Int32 flexcontroller_count;
+            public Int32 flexcontroller_index;
+
+            // mstudioflexrule_t
+            public Int32 flexrules_count;
+            public Int32 flexrules_index;
+
+            // mstudioikchain_t
+            public Int32 ikchain_count;
+            public Int32 ikchain_index;
+
+            // mstudiomouth_t
+            public Int32 mouths_count;
+            public Int32 mouths_index;
+
+            // mstudioposeparamdesc_t
+            public Int32 localposeparam_count;
+            public Int32 localposeparam_index;
+
+            public Int32 surfaceprop_index;
+
+            public Int32 keyvalue_index;
+            public Int32 keyvalue_count;
+
+            // mstudioiklock_t
+            public Int32 iklock_count;
+            public Int32 iklock_index;
+
+            public Single mass;
+            public Int32 contents;
+
+            // Eye data
+            public Int32 numeyeballs; // Replaces eye_count
+            public Int32 eyeballindex; // Replaces eye_offset
+
+            // mstudiomodelgroup_t
+            public Int32 includemodel_count;
+            public Int32 includemodel_index;
+
+            public Int32 virtualModel;
+            // Placeholder for mutable-void*
+
+            // mstudioanimblock_t
+            public Int32 animblocks_name_index;
+            public Int32 animblocks_count;
+            public Int32 animblocks_index;
+
+            public Int32 animblockModel;
+            // Placeholder for mutable-void*
+
+            public Int32 bonetablename_index;
+
+            public Int32 vertex_base;
+            public Int32 offset_base;
+
+            // Used with $constantdirectionallight from the QC
+            // Model should have flag #13 set if enabled
+            public Byte directionaldotproduct;
+
+            public Byte rootLod;
+            // Preferred rather than clamped
+
+            // 0 means any allowed, N means Lod 0 -> (N-1)
+            public Byte numAllowedRootLods;
+
+            public Byte unused;
+            public Int32 unused2;
+
+            // Backward compatibility for eye_count and eye_offset
+            [Obsolete("Use numeyeballs instead")] public Int32 eye_count => numeyeballs;
+
+            [Obsolete("Use eyeballindex instead")] public Int32 eye_offset => eyeballindex;
+
+            // mstudioflexcontrollerui_t
+            public Int32 flexcontrollerui_count;
+            public Int32 flexcontrollerui_index;
+
+
+            //
+            int numlocalattachments;
+            public int localattachmentindex;
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe mstudioattachment_t pLocalAttachment(int i)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            {
+                if (i >= 0 && i < numlocalattachments)
+                {
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+
+                    GetNumAttachments(i);
+                    localattachmentindex = +i;
+                    return (pLocalAttachment(i));
+                }
+
+                return pLocalAttachment(i);
+
+                {
+                }
+
+                //public:
+                void GetNumAttachments(int i)
+                {
+
+
+
+                }
+
+                mstudioattachment_t pAttachment(int i)
+                {
+
+
+                    return pAttachment(i);
+
+                }
+
+
+
+
+
+                int GetAttachmentBone(int i)
+                {
+                    return GetAttachmentBone(i);
+
+                }
+
+                // used on my tools in hlmv, not persistant
+                void SetAttachmentBone(int iAttachment, int iBone)
+                {
+                    SetAttachmentBone(iAttachment, iBone);
+
+                }
+            }
+
+            // animation node to animation node transition graph
+            //private:
+            int numlocalnodes;
+            int localnodeindex;
+            int localnodenameindex;
+            internal int numverts;
+            internal int vert_offset;
+            public int vertanim_fixed_point_scale;
+
+            internal int eyeball_offset;
+            internal int jigglebone_offset;
+            internal int jigglebone_count;
+            internal int localjiggleboneindex;
+            internal int numlocaljigglebones;
+            internal int jiggleboneindex;
+            internal long thisPointer;
+            internal readonly int numjigglebones;
+
+            public char pszLocalNodeName(int iNode)
+            {
+                if (iNode >= 0 && iNode < numlocalnodes)
+                {
+                    IntPtr nodenamePtr = (IntPtr)(localnodenameindex + iNode);
+
+                    IntPtr nodeNameService = Marshal.ReadIntPtr(nodenamePtr);
+
+                    char nodeName = new();
+
+
+
+                    nodenamePtr = nodeNameService;
+
+                    return nodeName;
+
+
+
+
+                }
+
+                else
+                {
+                    return new char();
+                }
+
+            }
+
+            public byte pLocalTransition(int i)
+            {
+
+                if (i >= 0 && i < (numlocalnodes * numlocalnodes))
+                {
+
+                    byte numLocalname = new byte();
+                    return (byte)(numLocalname + localnodeindex + i);
+                }
+                else
+                {
+
+
+
+                    return new byte();
+                }
+
+
+
+            }
+
+            /// </summary>
+            // your existing header field
+
+            /// <summary>
+            /// C# translation of the C++ inline: just forwards to the header's own method/field.
+            /// </summary>
+            public static float VertAnimFixedPointScale()
+            {
+                studiohdr_t hdr = new studiohdr_t();
+                // avoid divide-by-zero just in case
+                return hdr.vertanim_fixed_point_scale != 0
+                    ? 1.0f / hdr.vertanim_fixed_point_scale
+                    : 1.0f;
+            }
+        }
+        //public:
+
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct mstudioposeparamdesc_t
+        {
+            public int sznameindex;
+            public int flags;
+            public float start;
+            public float end;
+            public float loop;
+
+            // Method to retrieve the name as a string
+            public string pszName(byte* buffer)
+            {
+                // Calculate the pointer offset based on sznameindex
+                byte* namePtr = buffer + sznameindex;
+                int len = 0;
+
+                // Calculate the length of the string
+                while (*(namePtr + len) != 0)
+                {
+                    len++;
+                }
+
+                // Create a char array and copy characters from the pointer
+                char[] nameChars = new char[len];
+                for (int i = 0; i < len; i++)
+                {
+                    nameChars[i] = (char)*(namePtr + i);
+                }
+
+                // Return the string created from the char array
+                return new string(nameChars);
+            }
+        }
+
+
+        public unsafe struct mstudioflexop_t
+        {
+            public int op;
+            public fixed int d[1];
+        };
+
+        public unsafe struct mstudioflexrule_t
+        {
+            public int flex;
+            public int numops;
+            public int opindex;
+
+            public mstudioflexop_t* iFlexOp(int i) => (mstudioflexop_t*)((byte*)opindex + i);
+        };
+
+
+        unsafe public struct mstudioeyeball_t
+        {
+            public int sznameindex;
+            public int bone;
+            public Vector3 org;
+            public float zoffset;
+            public float radius;
+            public Vector3 up;
+            public Vector3 forward;
+            public int texture;
+            public int unused1;
+            public float iris_scale;
+            public int unused2;
+
+            public fixed int upperflexdesc[3];
+            public fixed int lowerflexdesc[3];
+            public fixed float uppertarget[3];
+            public fixed float lowertarget[3];
+            public int upperlidflexdesc;
+            public int lowerlidflexdesc;
+            public fixed int unused[4];
+            public bool m_bNonFACS;
+            public fixed int unused3[3];
+            public fixed int unused4[7];
+
+            // Parameterless constructor
+            public mstudioeyeball_t(int sznameindex, int bone, Vector3 org, float zoffset, float radius,
+                Vector3 up, Vector3 forward, int texture, int unused1, float iris_scale,
+                int unused2, int upperlidflexdesc, int lowerlidflexdesc, bool m_bNonFACS)
+            {
+                fixed (int* unsed_ = unused)
+                fixed (int* unused3_ = unused3)
+                fixed (int* unused4_ = unused4)
+
+                fixed (int* upperflex = upperflexdesc)
+                fixed (float* lowertarget_ = lowertarget)
+                fixed (int* lowerflex = lowerflexdesc)
+                fixed (float* uppertarget_ = uppertarget)
+                    this.sznameindex = sznameindex;
+                this.bone = bone;
+                this.org = org;
+                this.zoffset = zoffset;
+                this.radius = radius;
+                this.up = up;
+                this.forward = forward;
+                this.texture = texture;
+                this.unused1 = unused1;
+                this.iris_scale = iris_scale;
+                this.unused2 = unused2;
+                this.upperlidflexdesc = upperlidflexdesc;
+                this.lowerlidflexdesc = lowerlidflexdesc;
+                this.m_bNonFACS = m_bNonFACS;
+
+                // Initialize other fields with default values
+
+
+
+
+
+
+
+
+            }
+
+            // Private copy constructor
+            private mstudioeyeball_t(mstudioeyeball_t vOther)
+            {
+                fixed (int* unsed_ = unused)
+                fixed (int* unused3_ = unused3)
+                fixed (int* unused4_ = unused4)
+
+                fixed (int* upperflex = upperflexdesc)
+                fixed (float* lowertarget_ = lowertarget)
+                fixed (int* lowerflex = lowerflexdesc)
+                fixed (float* uppertarget_ = uppertarget)
+                    // Copy values from vOther to this instance
+                    this.sznameindex = vOther.sznameindex;
+                this.bone = vOther.bone;
+                this.org = vOther.org;
+                this.zoffset = vOther.zoffset;
+                this.radius = vOther.radius;
+                this.up = vOther.up;
+                this.forward = vOther.forward;
+                this.texture = vOther.texture;
+                this.unused1 = vOther.unused1;
+                this.iris_scale = vOther.iris_scale;
+                this.unused2 = vOther.unused2;
+                this.upperlidflexdesc = vOther.upperlidflexdesc;
+                this.lowerlidflexdesc = vOther.lowerlidflexdesc;
+                this.m_bNonFACS = vOther.m_bNonFACS;
+
+                // Initialize other fields with default values
+
+            }
+        }
+
+        public struct mstudioiklink_t
+        {
+            public int bone;
+            public Vector3 kneeDir;
+            public Vector3 unused0;
+        };
+
+        public unsafe struct mstudioikchain_t
+        {
+            public int sznameindex;
+            public int linktype;
+            public int numlinks;
+            public int linkindex;
+
+            public mstudioiklink_t* pLink(int i) => (mstudioiklink_t*)((byte*)linkindex + i);
+        };
+
+        public struct mstudioiface_t
+        {
+            public ushort a, b, c;
+        };
+
+
+        internal class Program
+        {
+            public static void Main(string[] args)
+            {
+                int EntryNode(int iSequence)
+                {
+                    return EntryNode(iSequence);
+                }
+
+                int ExitNode(int iSequence)
+                {
+
+                    return ExitNode(iSequence);
+
+                }
+
+                unsafe char* pszNodeName(int iNode)
+                {
+
+                    return pszNodeName(iNode);
+
+                }
+
+                int GetTransition(int iFrom, int iTo)
+                {
+
+                    return GetTransition(iFrom, iTo);
+
+                }
+
+                int numflexdesc;
+                int flexdescindex;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                unsafe mstudioflexdesc_t* pFlexdesc(int i)
+                {
+                    if (i >= 0 && i < numflexdesc)
+
+                        return (mstudioflexdesc_t*)+flexdescindex + i;
+                    {
+
+                        return pFlexdesc(i);
+
+
+                    }
+
+
+                }
+
+                int numflexcontrollers;
+                int flexcontrollerindex;
+
+                unsafe mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t l, int i)
+
+                {
+
+                    if (numflexcontrollers == 0 || (l >= 0 && i < numflexcontrollers))
+
+
+
+
+
+                        flexcontrollerindex = i;
+
+
+
+
+
+
+                    return pFlexcontroller(l, i);
+
+                }
+
+
+
+
+
+                int numflexrules;
+                int flexruleindex;
+
+                unsafe mstudioflexrule_t* pFlexRule(int i)
+                {
+                    if (i >= 0 && i < numflexrules)
+                    {
+
+                        return (mstudioflexrule_t*)(((byte*)+flexruleindex) + i);
+
+                    }
+
+                    return pFlexRule(i);
+                }
+
+
+                int numikchains;
+                int ikchainindex;
+
+                unsafe mstudioikchain_t* pIKChain(int i)
+
+                {
+                    if (i >= 0 && i < numikchains)
+                        return (mstudioikchain_t*)(((byte*)+ikchainindex) + i);
+
+
+                    return pIKChain(i);
+                }
+            }
+        }
+
+        public struct mstudioanimblock_t
+        {
+
+            public int datastart;
+            public int dataend;
+        };
+
+        struct mstudiomouth_t
+        {
+
+
+            public int bone;
+            public Vector3 forward;
+            public int flexdesc;
+
+            public void mstudiomouth_t_(mstudiomouth_t vOther)
+            {
+
+
+                vOther.bone = bone;
+            }
+        }
+
+        // No copy constructors allowed
+
+
+        public struct virtualmodel_t
+        {
+
+
+        }
+    };
+
+    //-----------------------------------------------------------------------------
+    // Purpose:
+    //-----------------------------------------------------------------------------
+
+    public unsafe partial struct vertexFileHeader_t_
+    {
+
+
+        int id; // MODEL_VERTEX_FILE_ID
+        int version; // MODEL_VERTEX_FILE_VERSION
+        int checksum; // same as studiohdr_t, ensures sync
+        int numLODs; // num of valid lods
+        fixed int numLODVertexes[3]; // num verts for desired root lod
+        int numFixups; // num of vertexFileFixup_t
+        int fixupTableStart; // offset from base to fixup table
+        int vertexDataStart; // offset from base to vertex block
+        public int tangentDataStart;
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        public unsafe mstudiovertex_t GetVertexData()
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+#pragma warning disable CS8500
+
+            if (vertexDataStart != 0)
+                return (mstudiovertex_t)(vertexDataStart + (byte)0);
+            else
+                return new();
+#pragma warning restore CS8500
+
+        }
+
+        // Accessor to (fat) tangent vertex data (tangents aren't stored in compressed data)
+        public unsafe Vector4* GetTangentData()
+        {
+            if ((tangentDataStart != 0))
+                return (Vector4*)(tangentDataStart + (byte)0);
+            else
+                return null;
+        }
+
+        // Accessor to thin vertex data
+        public unsafe thinModelVertices_t* GetThinVertexData()
+        {
+
+            if ((vertexDataStart != 0))
+                return (thinModelVertices_t*)(vertexDataStart + (byte*)0);
+            else
+                return null;
+        }
+
+
+    }
+
+
+    // offset from base to tangent block
+
+    // Accessor to fat
+    //
+    // vertex data
+
+
+
+
+
+    // model vert
+    class IDataCache
+    {
+
+
+    }
+
+    class IMDLCache
+    {
+
+
+    }
+
+    public class CStudioHdr
+    {
+
+        public
+            CStudioHdr()
+        {
+
+        }
+
+        unsafe CStudioHdr(studiohdr_t pStudioHdr, IMDLCache mdlcache = null)
+        {
+
+
+
+        }
+
+        ~CStudioHdr()
+        {
+            Term();
+        }
+
+        unsafe void Init(studiohdr_t pStudioHdr, IMDLCache mdlcache = null)
+
+        {
+
+
+        }
+
+        void Term()
+        {
+
+
+
+        }
+
+        public
+            unsafe bool IsVirtual()
+        {
+            return (m_pVModel != null);
+        }
+
+
+        unsafe bool IsValid()
+        {
+            IsReadyForAccess();
+            {
+
+            }
+
+            GetRenderHdr();
+            GetVirtualModel();
+
+
+            return (m_pStudioHdr != null);
+
+            unsafe bool IsReadyForAccess()
+            {
+                return (m_pStudioHdr != null);
+            }
+
+            unsafe virtualmodel_t* GetVirtualModel()
+            {
+                return m_pVModel;
+            }
+
+            unsafe studiohdr_t* GetRenderHdr()
+            {
+                return m_pStudioHdr;
+            }
+
+            ;
+
+            unsafe studiohdr_t* pSeqStudioHdr(int sequence)
+            {
+                return pSeqStudioHdr(sequence);
+
+            }
+
+            unsafe studiohdr_t* pAnimStudioHdr(int animation)
+            {
+
+                return pAnimStudioHdr(animation);
+
+            }
+
+
+        }
+
+        unsafe studiohdr_t* m_pStudioHdr;
+        unsafe virtualmodel_t* m_pVModel;
+
+        unsafe virtualmodel_t* ResetVModel(virtualmodel_t* pVModel)
+
+
+        {
+            return m_pVModel;
+        }
+
+        unsafe studiohdr_t* GroupStudioHdr(int group)
+        {
+
+            return GroupStudioHdr(group);
+
+        }
+
+        unsafe Vector3 CStudioHDR(studiohdr_t* m_pStudioHdrCache)
+        {
+
+            return new Vector3(1, -1, 1);
+
+        }
+
+        public unsafe struct mstudioiklock_t
+        {
+
+            int chain;
+            float flPosWeight;
+            float flLocalQWeight;
+            int flags;
+
+            fixed int unused[4];
+        }
+
+        int m_nFrameUnlockCounter;
+        int m_pFrameUnlockCounter;
+        CThreadFastMutex m_FrameUnlockCounterMutex;
+
+        Vector3 m_boneFlags;
+        Vector3 m_boneParent;
+        private int numbonecontrollers;
+        private int bonecontrollerindex;
+
+        public unsafe mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t i)
+            // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+
+            pFlexcontroller(i);
+
+            return pFlexcontroller(i);
+
+
+        }
+
+        unsafe int numbones()
+        {
+
+            numbones();
+
+            ;
+            {
+                return (int)m_pStudioHdr
+
+
+
+                    ;
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                unsafe mstudiobone_t pBone(int i)
+                {
+                    RemapAnimBone(bonecontrollerindex, 0);
+
+
+                    pBone(i);
+                    return pBone(i);
+
+
+                }
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+                int RemapAnimBone(int iAnim, int iLocalBone)
+                {
+
+                    return RemapSeqBone(iAnim, iLocalBone);
+
+
+                }
+
+
+
+                // maps local animations bone to global bone
+                int RemapSeqBone(int iSequence, int iLocalBone)
+                {
+                    SequencesAvailable();
+                    {
+                        {
+
+
+                        }
+
+                        return RemapSeqBone(iSequence, iLocalBone);
+
+                    }
+
+                    bool SequencesAvailable()
+                    {
+                        GetNumSeq();
+                        return true;
+
+                    }
+
+                    int GetNumSeq()
+                    {
+
+                        return new int();
+
+                    }
+
+                    mstudioanimdesc_t pAnimdesc(int i)
+                    {
+
+                        return pAnimdesc(i);
+                    }
+
+                    mstudioseqdesc_t pSeqdesc(int iSequence)
+                    {
+                        return pSeqdesc(iSequence);
+                    }
+
+                    int iRelativeAnim(int baseseq, int relanim)
+                    {
+                        return iRelativeAnim(baseseq, relanim);
+
+                    }
+
+                    // maps seq local anim reference to global anim index
+                    int iRelativeSeq(int baseseq, int relseq)
+                    {
+
+                        return iRelativeSeq(baseseq, relseq);
+
+                    }
+                    // maps seq local seq reference to global seq index
+
+                    int GetSequenceActivity(int iSequence)
+                    {
+                        return GetSequenceActivity(iSequence);
+
+
+
+
+
+
+
+
+
+                        void SetSequenceActivity(int iSequence, int iActivity)
+                        {
+                            GetSequencesActivities();
+
+                            float GetSequencesActivities()
+                            {
+
+                                SetSequenceActivity(iSequence, iActivity);
+                                return iActivity;
+                            }
+
+                        }
+
+
+
+
+                        int GetActivityListVersion()
+                        {
+                            GetActivityListVersion();
+                            return 1;
+                        }
+
+                        void SetActivityListVersion(int version)
+                        {
+                            SetActivityListVersion((int)version);
+
+                        }
+
+                        int GetEventListVersion(int version)
+                        {
+                            return GetEventListVersion(version);
+
+                        }
+
+                        void SetEventListVersion(int version)
+                        {
+
+                            SetEventListVersion(version);
+                        }
+
+
+                        //publ
+
+
+
+                        int GetNumAttachments()
+                        {
+
+                            return 1;
+                        }
+
+                        mstudioattachment_t pAttachment(int i)
+                        {
+                            GetNumAttachments();
+
+
+                            SetAttachmentBone(i, i);
+                            return pAttachment(i);
+
+                            // used on my tools in hlmv, not persistant
+                            void SetAttachmentBone(int iAttachment, int iBone)
+                            {
+
+
+
+
+
+
+                                int numlocalattachments;
+                                int localattachmentindex;
+
+
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                                unsafe mstudioattachment_t pLocalAttachment(int i)
+                                {
+                                    GetNumAttachments();
+                                    if (i >= 0 && i < numlocalattachments)
+
+                                    {
+
+                                        localattachmentindex = +i;
+
+                                    }
+
+                                    return pLocalAttachment(i);
+
+                                    //public:
+                                    int GetNumAttachments()
+                                    {
+
+                                        return 0;
+                                    }
+
+
+
+                                    mstudioattachment_t pAttachment(int i)
+                                    {
+                                        GetAttachmentBone(i);
+                                        return pAttachment(i);
+
+                                    }
+
+                                    int GetAttachmentBone(int i)
+                                    {
+                                        SetAttachmentBone(i, i);
+                                        return i;
+                                    }
+
+                                    // used on my tools in hlmv, not persistant
+                                    void SetAttachmentBone(int iAttachment, int iBone)
+                                    {
+
+
+
+
+                                    }
+
+
+
+
+
+                                    int EntryNode(int iSequence)
+                                    {
+
+                                        return EntryNode(iSequence);
+
+
+                                    }
+
+                                    int ExitNode(int iSequence)
+                                    {
+                                        return ExitNode(iSequence);
+
+
+                                    }
+
+                                    unsafe char* pszNodeName(int iNode)
+                                    {
+
+                                        return pszNodeName(iNode);
+
+                                    }
+
+                                    // FIXME: where should this one be?
+                                    int GetTransition(int iFrom, int iTo)
+                                    {
+                                        GetNumPoseParameters();
+
+                                        return GetTransition(iFrom, iTo);
+
+                                    }
+
+                                    int GetNumPoseParameters()
+                                    {
+
+                                        return 0;
+
+                                    }
+
+                                    mstudioposeparamdesc_t pPoseParameter(int i)
+                                    {
+
+                                        pPoseParameter(i);
+                                        return new mstudioposeparamdesc_t();
+
+                                    }
+
+                                    int GetSharedPoseParameter(int iSequence, int iLocalPose)
+                                    {
+
+                                        return GetSharedPoseParameter(iSequence, iLocalPose);
+
+                                    }
+
+                                    int GetNumIKAutoplayLocks()
+                                    {
+
+                                        GetNumIKAutoplayLocks();
+                                        return 0;
+                                    }
+
+                                    mstudioiklock_t pIKAutoplayLock(int i)
+                                    {
+
+
+                                        return pIKAutoplayLock(i);
+
+                                    }
+
+
+                                    int CountAutoplaySequences()
+
+                                    {
+                                        CountAutoplaySequences();
+
+                                        return (int)m_pStudioHdr;
+
+                                    }
+
+                                    int CopyAutoplaySequences(short* pOut, int outCount)
+
+                                    {
+                                        CopyAutoplaySequences(pOut, outCount);
+                                        return (int)m_pStudioHdr;
+
+
+
+
+                                    }
+
+
+                                    int GetAutoplayList(short** pOut)
+                                    {
+                                        GetAutoplayList(pOut);
+
+                                        return (int)m_pStudioHdr;
+
+
+
+
+                                    }
+
+
+                                }
+                            
+
+                            ;
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+                                unsafe mstudiobonecontroller_t* pBonecontroller(int i)
+                                {
+
+                                    if (i >= 0 && i < numbonecontrollers)
+
+
+
+                                        return (mstudiobonecontroller_t*)(((byte*)+bonecontrollerindex) + i);
+
+
+                                    return pBonecontroller(i);
+
+                                }
+
+
+                                int numikchains()
+                                {
+                                    numikchains();
+
+                                    return (int)m_pStudioHdr;
+
+                                }
+
+
+
+
+                                int GetNumIKChains()
+                                {
+                                    GetNumIKChains();
+
+                                    return (int)m_pStudioHdr;
+
+
+                                }
+
+                                ;
+
+                                mstudioikchain_t* pIKChain(int i)
+                                {
+
+                                    pIKChain(i);
+
+                                    return (mstudioikchain_t*)m_pStudioHdr;
+
+                                }
+
+
+
+                                int numflexrules()
+                                {
+
+                                    numflexrules();
+                                    return (int)m_pStudioHdr;
+
+
+
+                                }
+
+                                ;
+
+                                mstudioflexrule_t* pFlexRule(int i)
+                                {
+                                    pFlexRule(i);
+
+
+                                    return (mstudioflexrule_t*)m_pStudioHdr;
+
+
+
+                                }
+
+                                ;
+
+                                int numflexdesc()
+                                {
+                                    numflexdesc();
+                                    return (int)m_pStudioHdr;
+
+
+                                }
+
+
+                                mstudioflexdesc_t* pFlexdesc(int i)
+
+                                {
+                                    pFlexdesc(i);
+                                    return (mstudioflexdesc_t*)m_pStudioHdr;
+
+
+
+
+                                }
+
+                                ;
+
+
+
+                                LocalFlexController_t numflexcontrollers(LocalFlexController_t m_pStudioHdr)
+                                {
+                                    numflexcontrollers(m_pStudioHdr);
+                                    return m_pStudioHdr;
+
+                                }
+
+
+
+                            }
+
+
+
+
+                            int numflexcontrollerui()
+                            {
+                                numflexcontrollerui();
+
+
+                                return (int)m_pStudioHdr;
+
+                            }
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                            unsafe mstudioflexcontrollerui_t pFlexcontrollerUI(int i)
+                            {
+                                pFlexcontrollerUI(i);
+                                return pFlexcontrollerUI(i);
+                            }
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+                            //inline const char	*name() const { return m_pStudioHdr->name; }; // deprecated -- remove after full xbox merge
+                            unsafe char* pszName()
+                            {
+
+
+                                pszName();
+                                return (char*)m_pStudioHdr;
+
+                                int numbonecontrollers()
+                                {
+
+                                    numbonecontrollers();
+
+                                    return (int)m_pStudioHdr;
+                                }
+
+
+
+                                int numhitboxsets()
+
+                                {
+
+                                    numhitboxsets();
+                                    return (int)m_pStudioHdr;
+
+
+                                }
+
+                                unsafe mstudiohitboxset_t* pHitboxSet(int i)
+
+                                {
+                                    {
+                                        pHitboxSet(i);
+                                    }
+                                    ;
+
+                                    return (mstudiohitboxset_t*)m_pStudioHdr;
+                                }
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+                                unsafe mstudiobbox_t pHitbox(int i, int set)
+                                {
+
+                                    pHitbox(i, set);
+
+
+                                    return pHitbox(i, set);
+
+
+                                }
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+
+                                int iHitboxCount(int set)
+                                {
+                                    iHitboxCount(set);
+                                    {
+                                        return (int)m_pStudioHdr;
+
+
+
+
+                                    }
+
+                                    int numbodyparts()
+                                    {
+                                        numbodyparts();
+                                        {
+
+
+                                            return (int)m_pStudioHdr;
+                                        }
+
+
+                                        mstudiobodyparts_t* pBodypart(int i)
+                                        {
+                                            pBodypart(i);
+
+
+
+                                            return pBodypart(i);
+
+
+
+                                            int numskinfamilies()
+                                            {
+                                                numskinfamilies();
+
+                                                return (int)m_pStudioHdr;
+
+                                                Vector3 eyeposition()
+                                                {
+
+                                                    eyeposition();
+                                                    return m_pStudioHdr->eyeposition;
+
+
+                                                    int flags()
+                                                    {
+                                                        flags();
+                                                        return (int)m_pStudioHdr;
+
+
+
+                                                        char pszSurfaceProp()
+                                                        {
+                                                            pszSurfaceProp();
+
+                                                            return (char)(int)m_pStudioHdr;
+
+                                                        }
+
+
+                                                        float mass()
+                                                        {
+                                                            mass();
+                                                            return m_pStudioHdr->mass;
+
+
+
+
+
+                                                            int contents()
+                                                            {
+                                                                contents();
+                                                                return m_pStudioHdr->contents;
+
+
+                                                                byte* GetBoneTableSortedByName()
+                                                                {
+                                                                    GetBoneTableSortedByName();
+                                                                    return (byte*)m_pStudioHdr;
+
+                                                                }
+
+
+
+
+                                                                Vector3 illumposition()
+                                                                {
+                                                                    illumposition();
+                                                                    return m_pStudioHdr->illumposition;
+
+                                                                    Vector3 hull_min()
+                                                                    {
+                                                                        hull_min();
+                                                                        return
+                                                                            m_pStudioHdr->
+                                                                                hull_min; // ideal movement hull size
+
+                                                                        Vector3 hull_max()
+                                                                        {
+                                                                            hull_max();
+
+                                                                            return m_pStudioHdr->hull_max;
+
+                                                                            Vector3 view_bbmin()
+                                                                            {
+                                                                                view_bbmin();
+
+                                                                                return
+                                                                                    m_pStudioHdr->
+                                                                                        view_bbmin; // clipping bounding box
+
+                                                                                Vector3 view_bbmax()
+                                                                                {
+                                                                                    view_bbmax();
+                                                                                    return m_pStudioHdr->view_bbmax;
+                                                                                    {
+
+
+
+                                                                                    }
+
+                                                                                    int numtextures()
+                                                                                    {
+                                                                                        numtextures();
+
+                                                                                        return (int)m_pStudioHdr;
+
+
+                                                                                        int
+                                                                                            IllumPositionAttachmentIndex()
+                                                                                        {
+
+                                                                                            IllumPositionAttachmentIndex();
+                                                                                            return (int)m_pStudioHdr;
+
+
+
+                                                                                        }
+
+                                                                                        float MaxEyeDeflection()
+                                                                                        {
+                                                                                            MaxEyeDeflection();
+                                                                                            return (int)m_pStudioHdr;
+
+                                                                                            mstudiovertanim_t1.
+                                                                                                DeltaUnion.
+                                                                                                mstudiolinearbone_t*
+                                                                                                pLinearBones()
+                                                                                            {
+                                                                                                pLinearBones();
+                                                                                                return (
+                                                                                                    mstudiovertanim_t1.
+                                                                                                    DeltaUnion.
+                                                                                                    mstudiolinearbone_t
+                                                                                                    *)m_pStudioHdr;
+
+                                                                                                int
+                                                                                                    BoneFlexDriverCount()
+                                                                                                {
+                                                                                                    BoneFlexDriverCount();
+                                                                                                    return (int)
+                                                                                                        m_pStudioHdr;
+
+                                                                                                }
+
+                                                                                            }
+
+                                                                                            unsafe
+                                                                                                mstudioboneflexdriver_t*
+                                                                                                BoneFlexDriver(int i)
+                                                                                            {
+
+                                                                                                BoneFlexDriver(i);
+
+
+                                                                                                return (
+                                                                                                    mstudioboneflexdriver_t
+                                                                                                    *)m_pStudioHdr;
+                                                                                            }
+
+                                                                                        }
+
+
+
+                                                                                        float VertAnimFixedPointScale()
+                                                                                        {
+                                                                                            {
+                                                                                                VertAnimFixedPointScale();
+
+
+                                                                                                return
+                                                                                                    (int)m_pStudioHdr;
+                                                                                            }
+                                                                                        }
+
+
+
+
+
+
+                                                                                        float boneFlags(int iBone)
+                                                                                        {
+
+                                                                                            boneFlags(iBone);
+                                                                                            return m_boneFlags[iBone];
+
+                                                                                        }
+
+                                                                                        float boneParent(int iBone)
+                                                                                        {
+
+                                                                                            boneParent(iBone);
+                                                                                            return m_boneParent[iBone];
+
+                                                                                        }
+
+
+
+
+                                                                                        int IsSequenceLooping(
+                                                                                            int iSequence)
+                                                                                        {
+
+                                                                                            return IsSequenceLooping(
+                                                                                                iSequence);
+                                                                                        }
+
+                                                                                        float GetSequenceCycleRate(
+                                                                                            int iSequence)
+                                                                                        {
+                                                                                            return GetSequenceCycleRate(
+                                                                                                iSequence);
+
+                                                                                        }
+
+                                                                                        unsafe void RunFlexRules(
+                                                                                            float* src, float* dest)
+                                                                                        {
+                                                                                            RunFlexRules(src, dest);
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+
+        internal class CThreadFastMutex
+        {
         }
     }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // This class maps an activity to sequences allowed for that activity, accelerating the resolution
+    // of SelectWeightedSequence(), especially on PowerPC. Iterating through every sequence
+    // attached to a model turned out to be a very destructive cache access pattern on 360.
+    // 
+    // I've encapsulated this behavior inside a nested class for organizational reasons; there is
+    // no particular programmatic or efficiency benefit to it. It just makes clearer what particular
+    // code in the otherwise very complicated StudioHdr class has to do with this particular
+    // optimization, and it lets you collapse the whole definition down to a single line in Visual
+    // Studio.
+    class CActivityToSequenceMapping /* final */
+    {
+        // A tuple of a sequence and its corresponding weight. Lists of these correspond to activities.
+        unsafe struct SequenceTuple
+        {
+
+            public short seqnum;
+            public short weight; // the absolute value of the weight from the sequence header
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public SymbolToken pActivityModifiers; // list of activity modifier symbols
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public int iNumActivityModifiers;
+
+        }
+
+    };
+
+    // The type of the hash's stored data, a composite of both key and value
+    // (because that's how CUtlHash works):
+    // key: an int, the activity #
+    // values: an index into the m_pSequenceTuples array, a count of the
+    // total sequences present for an activity, and the sum of their
+    // weights.
+    // Note this struct is 128-bits wide, exactly coincident to a PowerPC 
+    // cache line and VMX register. Please consider very carefully the
+    // performance implications before adding any additional fields to this.
+    // You could probably do away with totalWeight if you really had to.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public struct HashValueType
+    {
+        // KEY (hashed)
+        public Int32 activityIdx;
+
+        // VALUE (not hashed)
+        public Int32 startingIdx;
+        public Int32 count;
+        public Int32 totalWeight;
+        public unsafe string Options => Marshal.PtrToStringAnsi((IntPtr)((byte*)+optionsIndex));
+        public int optionsIndex;
+
+
+
+        public HashValueType(int _actIdx, int _stIdx, int _ct, int _tW)
+        {
+
+
+            this.activityIdx = _actIdx;
+            this.startingIdx = _stIdx;
+            this.count = _ct;
+            this.totalWeight = _tW;
+
+            this.activityIdx = -1;
+            this.startingIdx = -1;
+            this.count = -1;
+            this.totalWeight = -1;
+            this.totalWeight = -1;
+
+
+            this.optionsIndex = -1;
+
+
+
+            UnityEngine.Debug.LogAssertion(
+                "<HashvalueType=-1>Error: <-1/HashValueType()> Don't use default HashValueType()!");
+        }
+
+        public void HashValueTypes(HashValueType hashValueType, HashFuncs hashFuncs)
+        {
+
+
+
+            hashValueType.activityIdx = 0;
+
+            hashFuncs.Equals(0);
+
+
+
+
+
+
+        }
+
+
+    }
+
+
+
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct mstudioevent_t
+    {
+        public float cycle; // Normalized cycle position (0 to 1) in the animation where the event occurs
+        public int type; // Type of the event (e.g., sound, particle, etc.)
+        public int @event; // Event ID or identifier
+        public int optionsIndex; // Index into a string table for event options
+        public int bone; // Bone index associated with the event (optional, depends on the event type)
+        public Vector3 position; // Position of the event (local to the bone or model)
+        public Int32 frame; // Frame where this event occurs
+        public Int32 eventID;
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+        public byte[] options; // Event-specific options or parameters (null-terminated string)
+
+        internal object eventname;
+
+        /// <summary>
+        /// Gets the options string as a .NET string.
+        /// </summary>
+        public string OptionsString => Encoding.UTF8.GetString(options).TrimEnd('\0');
+    }
+
+
+
+
+
+
+
+
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct mstudioikchain_t
+    {
+        public int nameIndex;
+        public unsafe string Name => Marshal.PtrToStringAnsi((IntPtr)((byte*)+nameIndex));
+        public int linkType;
+        public int numLinks;
+        public int linkIndex; // This would typically point to an array of mstudioiklinks
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct mstudioiklink_t
+    {
+        public int boneIndex;
+        public Vector3 contact; // Unity Vector3 used for position
+        public Vector3 limits; // Unity Vector3 used for rotation limits
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // default constructor (ought not to be actually used)
+
+
+    // Assume additional required structs here
+
+    // Ensuring Vector usage is compatible with Unity
+
+
+
+
+
+
+
+
+
+
+
+
+    public struct Vector
+    {
+        public float x, y, z;
+    }
+
+
+    public class HashFuncs : IEqualityComparer<HashValueType>
+    {
+        public bool Equals(HashValueType x, HashValueType y)
+        {
+            return x.activityIdx == y.activityIdx;
+        }
+
+        public int GetHashCode(HashValueType obj)
+        {
+            return obj.activityIdx.GetHashCode();
+        }
+
+
+
+
+
+
+        // We only hash on the activity index; everything else is data.
+
+        // optimization, and it lets you collapse the whole definition down to a single line in Visual
+        // Studio.
+
+        // A tuple of a sequence and its corresponding weight. Lists of these correspond to activities.
+        struct SequenceTuple
+        {
+            short seqnum;
+            short weight; // the absolute value of the weight from the sequence header
+        };
+
+
+        class CActivityToSequenceMapping /* final */
+        {
+
+
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe void Initialize(CStudioHdr pstudiohdr)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            {
+
+
+
+
+
+            }
+
+            /// Force Initialize() to occur again, even if it has already occured.
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe void Reinitialize(CStudioHdr pstudiohdr)
+            {
+
+
+
+
+
+            }
+
+
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe bool ValidateAgainst(CStudioHdr pstudiohdr)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            {
+
+
+
+
+                return ValidateAgainst(pstudiohdr);
+            }
+
+            // selects the sequence with the most matching modifiers
+
+            public unsafe int SelectWeightedSequenceFromModifiers(CStudioHdr pstudiohdr, int activity,
+                SymbolToken pActivityModifiers, int iModifierCount)
+            {
+
+
+                return SelectWeightedSequenceFromModifiers(pstudiohdr, activity, pActivityModifiers, iModifierCount);
+            }
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            public unsafe void SetValidationPair(CStudioHdr pstudiohdr)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            {
+
+            }
+
+            // Actually
+            public int NumSequencesForActivity(int forActivity)
+            {
+
+                return NumSequencesForActivity((int)forActivity);
+
+            }
+
+            public unsafe int SelectWeightedSequence(int activity, int curSequence)
+            {
+
+                return SelectWeightedSequence(activity, curSequence);
+            }
+
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+            public bool IsInitialized()
+            {
+
+
+                return true;
+            }
+#endif
+
+        }
+
+
+
+        // These must be here because IFM does not compile/link studio.cpp (?!?)
+
+        // ctor
+        void CActivityToSequenceMappings_()
+        {
+            /// A more efficient version of the old SelectWeightedSequence() function in animation.cpp. 
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+            unsafe int SelectWeightedSequence(CStudioHdr pstudiohdr, int activity, int curSequence)
+            {
+                return SelectWeightedSequence(pstudiohdr, activity, curSequence);
+
+            }
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        } // bu a big array, into which the hash values index.
+
+        SequenceTuple m_pSequenceTuples;
+        int[] m_iSequenceTuplesCount; // (size of the whole array)
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+
+#endif
+
+        // we don't store an outer pointer because we can't initialize it at construction time
+        // (warning c4355) -- there are ways around this but it's easier to just pass in a 
+        // pointer to the CStudioHdr when we need it, since this class isn't supposed to 
+        // export its interface outside the studio header anyway.
+        // CStudioHdr * const m_pOuter;
+
+        ActivityToValueIdxHash m_ActToSeqHash;
+
+        // we store these so we can know if the contents of the studiohdr have changed
+        // from underneath our feet (this is an emergency data integrity check)
+        unsafe void* m_expectedPStudioHdr;
+        unsafe void* m_expectedVModel;
+
+        // double-check that the data I point to hasn't changed
+
+
+
+
+
+        CActivityToSequenceMapping m_ActivityToSequence;
+
+        CUtlHash<HashValueType> ActivityToValueIdxHash;
+
+        /// A more efficient version of the old SelectWeightedSequence() function in animation.cpp. 
+        // ctor
+
+        // ctor
+        public class CActivityToSequenceMapping_
+        {
+            SequenceTuple[] SequenceTuples { get; set; }
+            public int[] SequenceTuplesCount { get; set; }
+            public CUtlHash<HashValueType> ActToSeqHash { get; set; }
+            public IntPtr ExpectedPStudioHdr { get; set; }
+            public IntPtr ExpectedVModel { get; set; }
+
+
+
+
+
+        }
+        // dtor -- not virtual because this class has no inheritors
+
+
+        void CActivityToSequenceMap_()
+        {
+
+
+            var m_pSequenceTuples = GameObject.Find("m_pSequenceTuples");
+
+            if (m_pSequenceTuples != null)
+            {
+                GameObject.Destroy(m_pSequenceTuples);
+
+
+            }
+        }
+
+        /// Get the list of sequences for an activity. Returns the pointer to the
+        /// first sequence tuple. Output parameters are a count of sequences present,
+        /// and the total weight of all the sequences. (it would be more LHS-friendly
+        /// to return these on registers, if only C++ offered more than one return 
+        /// value....)
+        unsafe SequenceTuple* GetSequences(int forActivity, int* outSequenceCount, int* outTotalWeight)
+        {
+
+            return GetSequences(forActivity, outSequenceCount, outTotalWeight);
+
+        }
+
+        /// The number of sequences available for an activity.
+        int NumSequencesForActivity(int forActivity)
+        {
+            return NumSequencesForActivity(forActivity);
+        }
+
+
+
+
+
+        /// Allocate my internal array. (It is freed in the destructor.) Also,
+        /// build the hash of activities to sequences and populate m_pSequenceTuples.
+
+
+        /// Force Initialize() to occur again, even if it has already occured.
+
+        // This takes the address of, gets the size of, or declares a pointer to a managed type
+        unsafe int SelectWeightedSequence(CStudioHdr pstudiohdr, int activity, int curSequence)
+            // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+
+
+            return SelectWeightedSequence(pstudiohdr, activity, curSequence);
+
+        }
+        // Actually a big array, into which the hash values index.
+
+
+
+
+        /// Allocate my internal array. (It is freed in the destructor.) Also,
+
+
+
+        /// True iff there is at least one sequence for the given activity.
+
+
+        // New additions from studio.h
+        public const string STUDIO_H = "#ifdef _WIN32";
+
+        public const string STUDIO_ENABLE_PERF_COUNTERS = "#define STUDIO_SEQUENCE_ACTIVITY_LOOKUPS_ARE_SLOW 0 ";
+        public const int STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE = 1;
+        public const int STUDIO_VERSION = 48;
+        public const string MAXSTUDIOTRIANGLES = "65536	// TODO: tune this";
+        public const string MAXSTUDIOVERTS = "65536	// TODO: tune this";
+
+        public const string MAXSTUDIOFLEXVERTS =
+            "10000	// max number of verts that can be flexed per mesh.  TODO: tune this";
+
+        public const string MAXSTUDIOSKINS = "32		// total textures";
+        public const string MAXSTUDIOBONES = "128		// total bones actually used";
+        public const string MAXSTUDIOFLEXDESC = "1024	// maximum number of low level flexes (actual morph targets)";
+        public const string MAXSTUDIOFLEXCTRL = "96		// maximum number of flexcontrollers (input sliders)";
+        public const int MAXSTUDIOPOSEPARAM = 24;
+        public const int MAXSTUDIOBONECTRLS = 4;
+        public const int MAXSTUDIOANIMBLOCKS = 256;
+        public const string MAXSTUDIOBONEBITS = "7		// NOTE: MUST MATCH MAXSTUDIOBONES";
+        public const int MAX_NUM_BONES_PER_VERT = 3;
+        public const int NEW_EVENT_STYLE = 1024;
+        public const int STUDIO_PROC_AXISINTERP = 1;
+        public const int STUDIO_PROC_QUATINTERP = 2;
+        public const int STUDIO_PROC_AIMATBONE = 3;
+        public const int STUDIO_PROC_AIMATATTACH = 4;
+        public const int STUDIO_PROC_JIGGLE = 5;
+        public const int JIGGLE_IS_FLEXIBLE = 1;
+        public const int JIGGLE_IS_RIGID = 2;
+        public const int JIGGLE_HAS_YAW_CONSTRAINT = 4;
+        public const int JIGGLE_HAS_PITCH_CONSTRAINT = 8;
+        public const int JIGGLE_HAS_ANGLE_CONSTRAINT = 16;
+        public const int JIGGLE_HAS_LENGTH_CONSTRAINT = 32;
+        public const int JIGGLE_HAS_BASE_SPRING = 64;
+        public const string JIGGLE_IS_BOING = "0x80		// simple squash and stretch sinusoid";
+        public const int BONE_CALCULATE_MASK = 31;
+        public const string BONE_PHYSICALLY_SIMULATED = "0x01	// bone is physically simulated when physics are active";
+        public const string BONE_PHYSICS_PROCEDURAL = "0x02	// procedural when physics is active";
+        public const string BONE_ALWAYS_PROCEDURAL = "0x04	// bone is always procedurally animated";
+        public const string BONE_SCREEN_ALIGN_SPHERE = "0x08	// bone aligns to the screen, not constrained in motion.";
+
+        public const string BONE_SCREEN_ALIGN_CYLINDER =
+            "0x10	// bone aligns to the screen, constrained by it's own axis.";
+
+        public const int BONE_USED_MASK = 524032;
+        public const int BONE_USED_BY_ANYTHING = 524032;
+        public const string BONE_USED_BY_HITBOX = "0x00000100	// bone (or child) is used by a hit box";
+        public const string BONE_USED_BY_ATTACHMENT = "0x00000200	// bone (or child) is used by an attachment point";
+        public const int BONE_USED_BY_VERTEX_MASK = 261120;
+
+        public const string BONE_USED_BY_VERTEX_LOD0 =
+            "0x00000400	// bone (or child) is used by the toplevel model via skinned vertex";
+
+        public const int BONE_USED_BY_VERTEX_LOD1 = 2048;
+        public const int BONE_USED_BY_VERTEX_LOD2 = 4096;
+        public const int BONE_USED_BY_VERTEX_LOD3 = 8192;
+        public const int BONE_USED_BY_VERTEX_LOD4 = 16384;
+        public const int BONE_USED_BY_VERTEX_LOD5 = 32768;
+        public const int BONE_USED_BY_VERTEX_LOD6 = 65536;
+        public const int BONE_USED_BY_VERTEX_LOD7 = 131072;
+
+        public const string BONE_USED_BY_BONE_MERGE =
+            "0x00040000	// bone is available for bone merge to occur against it";
+
+        public const int MAX_NUM_LODS = 8;
+        public const int BONE_TYPE_MASK = 15728640;
+
+        public const string BONE_FIXED_ALIGNMENT =
+            "0x00100000	// bone can't spin 360 degrees, all interpolation is normalized around a fixed orientation";
+
+        public const string BONE_HAS_SAVEFRAME_POS = "0x00200000	// Vector48";
+        public const string BONE_HAS_SAVEFRAME_ROT = "0x00400000	// Quaternion64";
+        public const int ATTACHMENT_FLAG_WORLD_ALIGN = 65536;
+        public const int IK_SELF = 1;
+        public const int IK_WORLD = 2;
+        public const int IK_GROUND = 3;
+        public const int IK_RELEASE = 4;
+        public const int IK_ATTACHMENT = 5;
+        public const int IK_UNLATCH = 6;
+        public const string STUDIO_ANIM_RAWPOS = "0x01 // Vector48";
+        public const string STUDIO_ANIM_RAWROT = "0x02 // Quaternion48";
+        public const string STUDIO_ANIM_ANIMPOS = "0x04 // mstudioanim_valueptr_t";
+        public const string STUDIO_ANIM_ANIMROT = "0x08 // mstudioanim_valueptr_t";
+        public const int STUDIO_ANIM_DELTA = 16;
+        public const string STUDIO_ANIM_RAWROT2 = "0x20 // Quaternion64";
+        public const string MODEL_VERTEX_FILE_ID = "(('V'<<24)+('S'<<16)+('D'<<8)+'I')";
+        public const int MODEL_VERTEX_FILE_VERSION = 4;
+        public const string MODEL_VERTEX_FILE_THIN_ID = "(('V'<<24)+('C'<<16)+('D'<<8)+'I')";
+        public const int STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX = 1;
+        public const int STUDIOHDR_FLAGS_USES_ENV_CUBEMAP = 2;
+        public const int STUDIOHDR_FLAGS_FORCE_OPAQUE = 4;
+        public const int STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS = 8;
+        public const int STUDIOHDR_FLAGS_STATIC_PROP = 16;
+        public const int STUDIOHDR_FLAGS_USES_FB_TEXTURE = 32;
+        public const int STUDIOHDR_FLAGS_HASSHADOWLOD = 64;
+        public const int STUDIOHDR_FLAGS_USES_BUMPMAPPING = 128;
+        public const int STUDIOHDR_FLAGS_USE_SHADOWLOD_MATERIALS = 256;
+        public const int STUDIOHDR_FLAGS_OBSOLETE = 512;
+        public const int STUDIOHDR_FLAGS_UNUSED = 1024;
+        public const int STUDIOHDR_FLAGS_NO_FORCED_FADE = 2048;
+        public const int STUDIOHDR_FLAGS_FORCE_PHONEME_CROSSFADE = 4096;
+        public const int STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT = 8192;
+        public const int STUDIOHDR_FLAGS_FLEXES_CONVERTED = 16384;
+        public const int STUDIOHDR_FLAGS_BUILT_IN_PREVIEW_MODE = 32768;
+        public const int STUDIOHDR_FLAGS_AMBIENT_BOOST = 65536;
+        public const int STUDIOHDR_FLAGS_DO_NOT_CAST_SHADOWS = 131072;
+        public const int STUDIOHDR_FLAGS_CAST_TEXTURE_SHADOWS = 262144;
+        public const int STUDIOHDR_FLAGS_VERT_ANIM_FIXED_POINT_SCALE = 2097152;
+        public const string STUDIO_CONST = "1	// get float";
+        public const string STUDIO_FETCH1 = "2	// get Flexcontroller value";
+        public const string STUDIO_FETCH2 = "3	// get flex weight";
+        public const int STUDIO_ADD = 4;
+        public const int STUDIO_SUB = 5;
+        public const int STUDIO_MUL = 6;
+        public const int STUDIO_DIV = 7;
+        public const string STUDIO_NEG = "8	// not implemented";
+        public const string STUDIO_EXP = "9	// not implemented";
+        public const string STUDIO_OPEN = "10	// only used in token parsing";
+        public const int STUDIO_CLOSE = 11;
+        public const string STUDIO_COMMA = "12	// only used in token parsing";
+        public const int STUDIO_MAX = 13;
+        public const int STUDIO_MIN = 14;
+
+        public const string STUDIO_2WAY_0 =
+            "15	// Fetch a value from a 2 Way slider for the 1st value RemapVal( 0.0, 0.5, 0.0, 1.0 )";
+
+        public const string STUDIO_2WAY_1 =
+            "16	// Fetch a value from a 2 Way slider for the 2nd value RemapVal( 0.5, 1.0, 0.0, 1.0 )";
+
+        public const string STUDIO_NWAY =
+            "17	// Fetch a value from a 2 Way slider for the 2nd value RemapVal( 0.5, 1.0, 0.0, 1.0 )";
+
+        public const string STUDIO_COMBO =
+            "18	// Perform a combo operation (essentially multiply the last N values on the stack)";
+
+        public const string STUDIO_DOMINATE = "19	// Performs a combination domination operation";
+        public const string STUDIO_DME_LOWER_EYELID = "20	// ";
+        public const string STUDIO_DME_UPPER_EYELID = "21	// ";
+        public const int STUDIO_X = 1;
+        public const int STUDIO_Y = 2;
+        public const int STUDIO_Z = 4;
+        public const int STUDIO_XR = 8;
+        public const int STUDIO_YR = 16;
+        public const int STUDIO_ZR = 32;
+        public const int STUDIO_LX = 64;
+        public const int STUDIO_LY = 128;
+        public const int STUDIO_LZ = 256;
+        public const int STUDIO_LXR = 512;
+        public const int STUDIO_LYR = 1024;
+        public const int STUDIO_LZR = 2048;
+        public const int STUDIO_LINEAR = 4096;
+        public const int STUDIO_TYPES = 262143;
+        public const string STUDIO_RLOOP = "0x00040000	// controller that wraps shortest distance";
+        public const string STUDIO_LOOPING = "0x0001		// ending frame should be the same as the starting frame";
+        public const string STUDIO_SNAP = "0x0002		// do not interpolate between previous animation and this one";
+        public const string STUDIO_DELTA = "0x0004		// this sequence  to the base sequences, not slerp blends";
+        public const string STUDIO_AUTOPLAY = "0x0008		// temporary flag that forces the sequence to always play";
+        public const string STUDIO_POST = "0x0010		// ";
+        public const string STUDIO_ALLZEROS = "0x0020		// this animation/sequence has no real animation data";
+        public const string STUDIO_CYCLEPOSE = "0x0080		// cycle index is taken from a pose parameter index";
+
+        public const string STUDIO_REALTIME =
+            "0x0100		// cycle index is taken from a real-time clock, not the animations cycle index";
+
+        public const string STUDIO_LOCAL = "0x0200		// sequence has a local context sequence";
+        public const string STUDIO_HIDDEN = "0x0400		// don't show in default selection views";
+        public const string STUDIO_OVERRIDE = "0x0800		// a forward declared sequence (empty)";
+        public const string STUDIO_ACTIVITY = "0x1000		// Has been updated at runtime to activity index";
+        public const string STUDIO_EVENT = "0x2000		// Has been updated at runtime to event index";
+        public const string STUDIO_WORLD = "0x4000		// sequence blends in worldspace";
+        public const string STUDIO_AL_POST = "0x0010		// ";
+
+        public const string STUDIO_AL_SPLINE =
+            "0x0040		// convert layer ramp in/out curve is a spline instead of linear";
+
+        public const string STUDIO_AL_XFADE =
+            "0x0080		// pre-bias the ramp curve to compense for a non-1 weight, assuming a second layer is also going to accumulate";
+
+        public const string STUDIO_AL_NOBLEND = "0x0200		// animation always blends at 1.0 (ignores weight)";
+        public const string STUDIO_AL_LOCAL = "0x1000		// layer is a local context sequence";
+        public const string STUDIO_AL_POSE = "0x4000		// layer blends using a pose parameter instead of parent cycle";
+
+        public struct mstudiodata_t
+        {
+            public int count;
+            public int offset;
+        }
+
+        public struct mstudioquatinterpbone_t
+        {
+            public int control;
+            public int numtriggers;
+            public int triggerindex;
+        }
+
+        public struct mstudiojigglebone_t
+        {
+            public int flags;
+            public float length;
+            public float tipMass;
+            public float yawStiffness;
+            public float yawDamping;
+            public float pitchStiffness;
+            public float pitchDamping;
+            public float alongStiffness;
+            public float alongDamping;
+            public float angleLimit;
+            public float minYaw;
+            public float maxYaw;
+            public float yawFriction;
+            public float yawBounce;
+            public float minPitch;
+            public float maxPitch;
+            public float pitchFriction;
+            public float pitchBounce;
+            public float baseMass;
+            public float baseStiffness;
+            public float baseDamping;
+            public float baseMinLeft;
+            public float baseMaxLeft;
+            public float baseLeftFriction;
+            public float baseMinUp;
+            public float baseMaxUp;
+            public float baseUpFriction;
+            public float baseMinForward;
+            public float baseMaxForward;
+            public float baseForwardFriction;
+            public float boingImpactSpeed;
+            public float boingImpactAngle;
+            public float boingDampingRate;
+            public float boingFrequency;
+            public float boingAmplitude;
+        }
+
+        public struct mstudiolinearbone_t
+        {
+            public int numbones;
+            public int flagsindex;
+        }
+
+        public unsafe struct mstudiobonecontroller_t
+        {
+            public int bone;
+            public int type;
+            public float start;
+            public float end;
+            public int rest;
+            public int inputfield;
+            public fixed int unused[8];
+        }
+
+        public struct mstudiomodelgrouplookup_t
+        {
+            public int modelgroup;
+            public int indexwithingroup;
+        }
+
+        public unsafe struct mstudiocompressedikerror_t
+        {
+            public fixed float scale[6];
+            public fixed short offset[6];
+        }
+
+        public struct mstudioikrule_t
+        {
+            public int index;
+            public int type;
+            public int chain;
+            public int bone;
+            public int slot;
+            public float height;
+            public float radius;
+            public float floor;
+            public Vector3 pos;
+            public Quaternion q;
+            public int compressedikerrorindex;
+        }
+
+        public unsafe struct mstudioiklock_t
+        {
+            public int chain;
+            public float flPosWeight;
+            public float flLocalQWeight;
+            public int flags;
+            public fixed int unused[4];
+        }
+
+        public struct mstudiolocalhierarchy_t
+        {
+            public int iBone;
+            public int iNewParent;
+            public float start;
+            public float peak;
+            public float tail;
+            public float end;
+            public int iStart;
+            public int localanimindex;
+        }
+
+        public unsafe struct mstudioanim_valueptr_t
+        {
+            public fixed short offset[3];
+        }
+
+        public struct mstudioanim_t
+        {
+            public byte bone;
+            public byte flags;
+        }
+
+        public struct mstudioanimblock_t
+        {
+            public int datastart;
+            public int dataend;
+        }
+
+        public struct mstudioanimsections_t
+        {
+            public int animblock;
+            public int animindex;
+        }
+
+        public struct mstudioautolayer_t
+        {
+            public short iSequence;
+            public short iPose;
+            public int flags;
+            public float start;
+            public float peak;
+            public float tail;
+            public float end;
+        }
+
+        public unsafe struct mstudiovertanim_t
+        {
+            public byte speed;
+            public byte side;
+            public fixed short delta[3];
+            public fixed float flDelta[3];
+            public Int32 index;
+        }
+
+        public struct mstudioflex_t
+        {
+            public int flexdesc;
+            public float target0;
+            public float target1;
+            public float target2;
+            public float target3;
+            public int numverts;
+            public int vertindex;
+        }
+
+        public struct mstudioflexrule_t
+        {
+            public int flex;
+            public int numops;
+            public int opindex;
+        }
+
+        public unsafe struct mstudioboneweight_t
+        {
+            public fixed float weight[MAX_NUM_BONES_PER_VERT];
+            public fixed char bone[MAX_NUM_BONES_PER_VERT];
+            public byte numbones;
+        }
+
+        public struct mstudioiface_t
+        {
+
+        }
+
+        public struct mstudio_modelvertexdata_t
+        {
+
+        }
+
+        public unsafe struct mstudio_meshvertexdata_t
+        {
+            public fixed int numLODVertexes[MAX_NUM_LODS];
+        }
+
+        public struct mstudiomesh_t
+        {
+            public int material;
+            public int modelindex;
+            public int numvertices;
+            public int vertexoffset;
+            public int numflexes;
+            public int flexindex;
+        }
+
+        public struct studiomeshdata_t
+        {
+            public int m_NumGroup;
+        }
+
+        public struct studioloddata_t
+        {
+            public float m_SwitchPoint;
+            public int numMaterials;
+            public int m_nDecalBoneCount;
+        }
+
+        public struct vertexFileFixup_t
+        {
+            public int lod;
+            public int sourceVertexID;
+            public int numVertexes;
+        }
+
+        public struct flexweight_t
+        {
+            public int key;
+            public Vector3 weight;
+            public float influence;
+        }
+
+        // New additions from studio.cpp
+
+        /// 
+
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        public unsafe bool HaveSelectWeightSequence(int activity, CStudioHdr pstudiohdr, int curSequence)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+            if (!m_ActivityToSequence.IsInitialized())
+            {
+                m_ActivityToSequence.Initialize(pstudiohdr);
+            }
+#endif
+            return (m_ActivityToSequence.SelectWeightedSequence(activity, curSequence) > 0);
+        }
+
+
+
+        // We lazy-initialize the header on demand here, because CStudioHdr::Init() is
+        // called from the constructor, at which time the this pointer is illegitimate.
+
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        unsafe bool HaveSequenceForActivity(int activity, CStudioHdr pstudiohdr)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+            if (!m_ActivityToSequence.IsInitialized())
+            {
+                m_ActivityToSequence.Initialize(pstudiohdr);
+            }
+#endif
+            return (m_ActivityToSequence.NumSequencesForActivity(activity) > 0);
+        }
+
+        // Force this CStudioHdr's activity-to-sequence mapping to be reinitialized
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        unsafe void ReinitializeSequenceMapping(CStudioHdr pstudiohdr)
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+        {
+
+            m_ActivityToSequence.Reinitialize(pstudiohdr);
+        }
+
+        // timing info
+        int m_nPerfAnimatedBones;
+        int m_nPerfUsedBones;
+        int m_nPerfAnimationLayers;
+
+
+
+
+
+
+#if STUDIO_ENABLE_PERF_COUNTERS
+
+        void ClearPerfCounters()
+        {
+            m_nPerfAnimatedBones = 0;
+            m_nPerfUsedBones = 0;
+            m_nPerfAnimationLayers = 0;
+
+
+        }
+
+    }
+
+
+
+
+#endif
+
+
+/// <summary>
+/// sizeof = 216
+/// </su
+
+
+
+#endregion
+
+#endregion
+
+#endregion
+
+#endregion
+
+
+#endregion
+
+
+#endregion
+
+
+#endregion
+
+
+#endregion
+
+
+#endregion
+
+
+
+#endregion
+
+
+
+
+#endregion
+
+
+#endregion
+
+
+

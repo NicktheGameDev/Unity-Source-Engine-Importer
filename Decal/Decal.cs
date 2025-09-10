@@ -12,7 +12,7 @@ namespace uSource.Decals
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [ExecuteInEditMode]
-    public class Decal : MonoBehaviour
+    public class Decal_ : MonoBehaviour
     {
 
         [FormerlySerializedAs("material")] public Material Material;
@@ -41,7 +41,7 @@ namespace uSource.Decals
         [MenuItem("GameObject/Decal")]
         internal static void Create()
         {
-            new GameObject("Decal", typeof(Decal), typeof(MeshFilter), typeof(MeshRenderer)).isStatic = true;
+            new GameObject("Decal", typeof(Decal_), typeof(MeshFilter), typeof(MeshRenderer)).isStatic = true;
         }
 #endif
 
@@ -115,7 +115,7 @@ namespace uSource.Decals
         void Awake()
         {
             var mesh = MeshFilter.sharedMesh;
-            var meshes = GameObject.FindObjectsOfType<Decal>().Select(i => i.MeshFilter.sharedMesh);
+            var meshes = GameObject.FindObjectsByType<Decal_>(FindObjectsSortMode.None).Select(i => i.MeshFilter.sharedMesh);
             if (meshes.Contains(mesh)) MeshFilter.sharedMesh = null; // if mesh was copied
         }
 

@@ -1,0 +1,17 @@
+﻿public class FlexController
+{
+    public string Name { get; set; }
+    public float Min { get; set; }
+    public float Max { get; set; }
+    public float Current { get; set; }
+    public float Default { get; set; } // Dodano pole Default
+
+    public FlexController(string name, float min, float max, float defaultValue)
+    {
+        Name = name;
+        Min = min;
+        Max = max;
+        Current = defaultValue;
+        Default = defaultValue; // Ustawienie Default
+    }
+}

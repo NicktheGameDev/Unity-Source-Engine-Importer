@@ -1,0 +1,1613 @@
+﻿using Crowbar;
+using RogoDigital;
+using RogoDigital.Lipsync;
+using System;
+using System.CodeDom;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEditor.Rendering;
+
+#endif
+using UnityEngine;
+using uSource.Formats.Source.VTF;
+using uSource.MathLib;
+using static HashFuncs;
+using static PixelCrushers.LODManager;
+using Object = UnityEngine.Object;
+
+namespace uSource.Formats.Source.MDL
+{
+    [Serializable]
+    public struct MdlEventInfo
+    {
+        public float time;
+        public int type;
+        public string options;
+    }
+
+    public class MDLFile : StudioStruct
+    {
+        public studiohdr_t MDL_Header;
+        public string[] MDL_BoneNames;
+        public mstudiobone_t[] MDL_StudioBones;
+        public mstudiohitboxset_t[] MDL_Hitboxsets;
+        private Hitbox[][] Hitboxes;
+
+        public static byte[] mdldata;
+        public static byte[] vvdData;
+
+        public mstudioflexdesc_t[] MDL_FlexDescs;
+        public List<mstudiovertanim_t[]> MDL_FlexAnims;
+        private List<Dictionary<int, Vector3>> _flexLookup;
+        private string[] _flexNames;
+
+        public mstudioanimdesc_t[] MDL_AniDescriptions;
+        public AniInfo[] Animations;
+        public mstudioseqdesc_t[] MDL_SeqDescriptions;
+        public SeqInfo[] Sequences;
+        public mstudioevent_t[] MDL_Events;
+        public event Action<GameObject, string> OnPhonemeEvent;
+
+        public mstudiotexture_t[] MDL_TexturesInfo;
+        public string[] MDL_TDirectories;
+        public string[] MDL_Textures;
+
+        public StudioBodyPart[] MDL_Bodyparts;
+        public mstudioflex_t[] MDL_Flexes;
+        public mstudiojigglebone_t[] MDL_JiggleBones;
+        public mstudioeyeball_t[] MDL_Eyeballs;
+
+       
+        public bool BuildMesh = true;
+        private int vertCountLOD0;
+
+        public MDLFile(Stream input, bool parseAnims = false, bool parseHitboxes = false)
+        {
+            if (mdldata == null)
+            {
+                using var ms = new MemoryStream();
+                input.Position = 0;
+                input.CopyTo(ms);
+                mdldata = ms.ToArray();
+                input.Position = 0;
+            }
+
+            using var r = new uReader(input);
+            r.ReadTypeFixed(ref MDL_Header, 392);
+            if (MDL_Header.id != 0x54534449)
+                throw new FileLoadException("Not an IDST-based MDL");
+
+            // Bones
+            MDL_StudioBones = new mstudiobone_t[MDL_Header.bone_count];
+            MDL_BoneNames = new string[MDL_Header.bone_count];
+            for (int i = 0; i < MDL_Header.bone_count; i++)
+            {
+                int off = MDL_Header.bone_offset + 216 * i;
+                r.ReadTypeFixed(ref MDL_StudioBones[i], 216, off);
+                MDL_BoneNames[i] = r.ReadNullTerminatedString(off + MDL_StudioBones[i].sznameindex);
+            }
+
+            // Hitboxes
+            if (parseHitboxes)
+            {
+                if (MDL_Header.hitbox_count > 0)
+                {
+                    MDL_Hitboxsets = new mstudiohitboxset_t[MDL_Header.hitbox_count];
+                    Hitboxes = new Hitbox[MDL_Header.hitbox_count][];
+                    for (int h = 0; h < MDL_Header.hitbox_count; h++)
+                    {
+                        int off = MDL_Header.hitbox_offset + 12 * h;
+                        r.ReadTypeFixed(ref MDL_Hitboxsets[h], 12, off);
+                        int cnt = MDL_Hitboxsets[h].numhitboxes;
+                        Hitboxes[h] = new Hitbox[cnt];
+                        for (int b = 0; b < cnt; b++)
+                        {
+                            int boff = off + MDL_Hitboxsets[h].hitboxindex + 68 * b;
+                            Hitboxes[h][b].BBox = new mstudiobbox_t();
+                            r.ReadTypeFixed(ref Hitboxes[h][b].BBox, 68, boff);
+                        }
+                    }
+                }
+            }
+
+            // Jiggle bones
+            {
+                int count = 0;
+                int index = 0;
+                if (FieldExists(() => MDL_Header.numjigglebones))
+                    count = MDL_Header.numjigglebones;
+                if (FieldExists(() => MDL_Header.jiggleboneindex))
+                    index = MDL_Header.jiggleboneindex;
+                if (count == 0 && FieldExists(() => MDL_Header.numlocaljigglebones))
+                    count = MDL_Header.numlocaljigglebones;
+                if (index == 0 && FieldExists(() => MDL_Header.localjiggleboneindex))
+                    index = MDL_Header.localjiggleboneindex;
+
+                if (count <= 0 || index <= 0)
+                {
+                    MDL_JiggleBones = Array.Empty<mstudiojigglebone_t>();
+                }
+                else
+                {
+                    int size = Marshal.SizeOf<mstudiojigglebone_t>();
+                    long fileLen = r.BaseStream.Length;
+                    long offset = index + (MDL_Header.thisPointer == 0 ? 0 : MDL_Header.thisPointer);
+                    if (offset + (long)count * size > fileLen)
+                    {
+                        MDL_JiggleBones = Array.Empty<mstudiojigglebone_t>();
+                    }
+                    else
+                    {
+                        MDL_JiggleBones = new mstudiojigglebone_t[count];
+                        r.BaseStream.Position = offset;
+                        for (int i = 0; i < count; ++i)
+                            r.ReadType(ref MDL_JiggleBones[i]);
+                    }
+                }
+
+                static bool FieldExists<T>(Expression<Func<T>> expr)
+                {
+                    if (expr.Body is MemberExpression m &&
+                        m.Member is FieldInfo fi &&
+                        fi.DeclaringType == typeof(studiohdr_t))
+                    {
+                        return fi != null;
+                    }
+                    return false;
+                }
+            }
+
+            // Animations + sequences + eyeballs + events
+            if (parseAnims)
+            {
+                // Animations
+                MDL_AniDescriptions = new mstudioanimdesc_t[MDL_Header.localanim_count];
+                Animations = new AniInfo[MDL_Header.localanim_count];
+
+                for (Int32 AnimID = 0; AnimID < MDL_Header.localanim_count; AnimID++)
+                {
+                    Int32 AnimOffset = MDL_Header.localanim_offset + (100 * AnimID);
+                    r.ReadTypeFixed(ref MDL_AniDescriptions[AnimID], 100, AnimOffset);
+                    mstudioanimdesc_t StudioAnim = MDL_AniDescriptions[AnimID];
+                    String StudioAnimName = r.ReadNullTerminatedString(AnimOffset + StudioAnim.sznameindex);
+
+                    Animations[AnimID] = new AniInfo
+                    {
+                        name = StudioAnimName,
+                        studioAnim = StudioAnim,
+                        AnimationBones = new List<AnimationBone>()
+                    };
+
+                    r.BaseStream.Position = AnimOffset;
+                    Int64 StartOffset = r.BaseStream.Position;
+                    Int32 CurrentOffset = MDL_AniDescriptions[AnimID].animindex;
+                    Int16 NextOffset;
+
+                    do
+                    {
+                        if (StartOffset + CurrentOffset < 0 || StartOffset + CurrentOffset >= r.BaseStream.Length)
+                            break;
+
+                        r.BaseStream.Position = StartOffset + CurrentOffset;
+                        Byte BoneIndex = r.ReadByte();
+                        Byte BoneFlag = r.ReadByte();
+                        NextOffset = r.ReadInt16();
+                        CurrentOffset += NextOffset;
+
+                        AnimationBone AnimatedBone = new AnimationBone(
+                            BoneIndex,
+                            BoneFlag,
+                            MDL_AniDescriptions[AnimID].numframes
+                        );
+                        AnimatedBone.ReadData(r);
+                        Animations[AnimID].AnimationBones.Add(AnimatedBone);
+
+                    } while (NextOffset != 0);
+
+                    Int32 NumBones = MDL_Header.bone_count;
+                    Int32 NumFrames = StudioAnim.numframes;
+                    bool FramesLess = (NumFrames < 2);
+                    if (FramesLess) NumFrames += 1;
+
+                    Animations[AnimID].PosX = new Keyframe[NumFrames][];
+                    Animations[AnimID].PosY = new Keyframe[NumFrames][];
+                    Animations[AnimID].PosZ = new Keyframe[NumFrames][];
+                    Animations[AnimID].RotX = new Keyframe[NumFrames][];
+                    Animations[AnimID].RotY = new Keyframe[NumFrames][];
+                    Animations[AnimID].RotZ = new Keyframe[NumFrames][];
+                    Animations[AnimID].RotW = new Keyframe[NumFrames][];
+
+                    for (Int32 FrameID = 0; FrameID < NumFrames; FrameID++)
+                    {
+                        Animations[AnimID].PosX[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].PosY[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].PosZ[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].RotX[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].RotY[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].RotZ[FrameID] = new Keyframe[NumBones];
+                        Animations[AnimID].RotW[FrameID] = new Keyframe[NumBones];
+                    }
+
+                    for (Int32 boneID = 0; boneID < NumBones; boneID++)
+                    {
+                        AnimationBone AnimBone = Animations[AnimID].AnimationBones.FirstOrDefault(x => x.Bone == boneID);
+
+                        for (Int32 frameID = 0; frameID < NumFrames; frameID++)
+                        {
+                            float time = frameID / StudioAnim.fps;
+                            mstudiobone_t SBone = MDL_StudioBones[boneID];
+                            Vector3 Position = SBone.pos;
+                            Vector3 Rotation = SBone.rot;
+
+                            if (AnimBone != null)
+                            {
+                                if ((AnimBone.Flags & STUDIO_ANIM_RAWROT) > 0)
+                                    Rotation = MathLibrary.ToEulerAngles(AnimBone.pQuat48);
+                                if ((AnimBone.Flags & STUDIO_ANIM_RAWROT2) > 0)
+                                    Rotation = MathLibrary.ToEulerAngles(AnimBone.pQuat64);
+                                if ((AnimBone.Flags & STUDIO_ANIM_RAWPOS) > 0)
+                                    Position = AnimBone.pVec48;
+                                if ((AnimBone.Flags & STUDIO_ANIM_ANIMROT) > 0)
+                                    Rotation += AnimBone.FrameAngles[(FramesLess && frameID != 0) ? frameID - 1 : frameID]
+                                                .Multiply(SBone.rotscale);
+                                if ((AnimBone.Flags & STUDIO_ANIM_ANIMPOS) > 0)
+                                    Position += AnimBone.FramePositions[(FramesLess && frameID != 0) ? frameID - 1 : frameID]
+                                                .Multiply(SBone.posscale);
+                                if ((AnimBone.Flags & STUDIO_ANIM_DELTA) > 0)
+                                {
+                                    Position = Vector3.zero;
+                                    Rotation = Vector3.zero;
+                                }
+                            }
+
+                            if (SBone.parent == -1)
+                                Position = MathLibrary.SwapY(Position);
+                            else
+                                Position.x = -Position.x;
+
+                            Position *= uLoader.UnitScale;
+                            Rotation *= Mathf.Rad2Deg;
+
+                            Quaternion quat = (SBone.parent == -1)
+                                ? Quaternion.Euler(-90, 180, -90) * MathLibrary.AngleQuaternion(Rotation)
+                                : MathLibrary.AngleQuaternion(Rotation);
+
+                            Animations[AnimID].PosX[frameID][boneID] = new Keyframe(time, Position.x);
+                            Animations[AnimID].PosY[frameID][boneID] = new Keyframe(time, Position.y);
+                            Animations[AnimID].PosZ[frameID][boneID] = new Keyframe(time, Position.z);
+                            Animations[AnimID].RotX[frameID][boneID] = new Keyframe(time, quat.x);
+                            Animations[AnimID].RotY[frameID][boneID] = new Keyframe(time, quat.y);
+                            Animations[AnimID].RotZ[frameID][boneID] = new Keyframe(time, quat.z);
+                            Animations[AnimID].RotW[frameID][boneID] = new Keyframe(time, quat.w);
+                        }
+                    }
+                }
+
+                // Sequences
+                MDL_SeqDescriptions = new mstudioseqdesc_t[MDL_Header.localseq_count];
+                Sequences = new SeqInfo[MDL_Header.localseq_count];
+
+                for (Int32 seqID = 0; seqID < MDL_Header.localseq_count; seqID++)
+                {
+                    Int32 sequenceOffset = MDL_Header.localseq_offset + (212 * seqID);
+                    r.ReadTypeFixed(ref MDL_SeqDescriptions[seqID], 212, sequenceOffset);
+                    mstudioseqdesc_t Sequence = MDL_SeqDescriptions[seqID];
+                    Sequences[seqID] = new SeqInfo
+                    {
+                        name = r.ReadNullTerminatedString(sequenceOffset + Sequence.szlabelindex),
+                        seq = Sequence
+                    };
+
+                    r.BaseStream.Position = sequenceOffset + Sequence.animindexindex;
+                    short[] animIndices = r.ReadShortArray(Sequence.groupsize[0] * Sequence.groupsize[1]);
+
+                    List<AniInfo> seqAnimList = new List<AniInfo>();
+                    for (int i = 0; i < animIndices.Length; i++)
+                    {
+                        int aID = animIndices[i];
+                        if (aID >= 0 && aID < Animations.Length)
+                            seqAnimList.Add(Animations[aID]);
+                    }
+                    Sequences[seqID].ani = seqAnimList;
+                }
+
+                // Eyeballs
+                if (MDL_Header.numeyeballs > 0)
+                {
+                    MDL_Eyeballs = new mstudioeyeball_t[MDL_Header.numeyeballs];
+                    for (int e = 0; e < MDL_Eyeballs.Length; e++)
+                    {
+                        int off = MDL_Header.eyeball_offset + e * Marshal.SizeOf<mstudioeyeball_t>();
+                        r.ReadTypeFixed(ref MDL_Eyeballs[e], Marshal.SizeOf<mstudioeyeball_t>(), off);
+                    }
+                }
+                else MDL_Eyeballs = Array.Empty<mstudioeyeball_t>();
+
+                // Events
+                var evList = new List<mstudioevent_t>();
+                using var ms = new MemoryStream(mdldata, false);
+                using var rr = new uReader(ms);
+                int sz = Marshal.SizeOf<mstudioevent_t>();
+                if (MDL_SeqDescriptions != null)
+                {
+                    for (int s = 0; s < MDL_SeqDescriptions.Length; s++)
+                    {
+                        var sd = MDL_SeqDescriptions[s];
+                        if (sd.numevents == 0) continue;
+                        long baseOff = MDL_Header.localseq_offset + 212 * s;
+                        for (int e = 0; e < sd.numevents && evList.Count < 1000; e++)
+                        {
+                            var ev = new mstudioevent_t();
+                            rr.ReadTypeFixed(ref ev, sz, (int)(baseOff + sd.eventindex + e * sz));
+                            evList.Add(ev);
+                        }
+                    }
+                }
+                MDL_Events = evList.ToArray();
+            }
+
+            // Textures
+            MDL_TexturesInfo = new mstudiotexture_t[MDL_Header.texture_count];
+            MDL_Textures = new string[MDL_Header.texture_count];
+            for (int i = 0; i < MDL_Header.texture_count; i++)
+            {
+                int off = MDL_Header.texture_offset + 64 * i;
+                r.ReadTypeFixed(ref MDL_TexturesInfo[i], 64, off);
+                MDL_Textures[i] = r.ReadNullTerminatedString(off + MDL_TexturesInfo[i].sznameindex);
+            }
+
+            MDL_TDirectories = new string[MDL_Header.texturedir_count];
+            for (int d = 0; d < MDL_Header.texturedir_count; d++)
+            {
+                int off = MDL_Header.texturedir_offset + 4 * d;
+                int ptr = 0;
+                r.ReadTypeFixed(ref ptr, 4, off);
+                MDL_TDirectories[d] = r.ReadNullTerminatedString(ptr);
+            }
+
+            // Bodyparts + models
+            MDL_Bodyparts = new StudioBodyPart[MDL_Header.bodypart_count];
+            for (int bp = 0; bp < MDL_Header.bodypart_count; bp++)
+            {
+                int off = MDL_Header.bodypart_offset + 16 * bp;
+                var bpinfo = new mstudiobodyparts_t();
+                r.ReadTypeFixed(ref bpinfo, 16, off);
+                var part = new StudioBodyPart
+                {
+                    Name = bpinfo.sznameindex != 0 ? r.ReadNullTerminatedString(off + bpinfo.sznameindex) : string.Empty,
+                    Models = new StudioModel[bpinfo.nummodels]
+                };
+
+                for (int m = 0; m < bpinfo.nummodels; m++)
+                {
+                    int moff = off + bpinfo.modelindex + 148 * m;
+                    var mm = new mstudiomodel_t();
+                    r.ReadTypeFixed(ref mm, 148, moff);
+                    if (m == 0)
+                        vertCountLOD0 = mm.numvertices;
+
+                    var sm = new StudioModel
+                    {
+                        isBlank = mm.numvertices <= 0 || mm.nummeshes <= 0,
+                        Model = mm,
+                        Meshes = new mstudiomesh_t[mm.nummeshes],
+                        IndicesPerLod = Enumerable.Range(0, 8).Select(_ => new Dictionary<int, List<int>>()).ToArray(),
+                        VerticesPerLod = new mstudiovertex_t[8][]
+                    };
+
+                    sm.VerticesGlobalStart = mm.vertexindex;
+                    if (sm.NumLODs > 0 && vertCountLOD0 > 0)
+                        sm.LODRemap = r.ReadUshortArray(vertCountLOD0 * sm.NumLODs);
+                    else
+                        sm.LODRemap = Array.Empty<ushort>();
+
+                    for (int s = 0; s < mm.nummeshes; s++)
+                    {
+                        int so = moff + mm.meshindex + 116 * s;
+                        r.ReadTypeFixed(ref sm.Meshes[s], 116, so);
+                    }
+
+                    part.Models[m] = sm;
+                }
+
+                MDL_Bodyparts[bp] = part;
+            }
+        }
+
+        public static MDLFile Load(string mdlPath, bool parseAnims = false, bool parseHitboxes = false)
+        {
+            mdldata = File.ReadAllBytes(mdlPath);
+            string vvdPath = Path.ChangeExtension(mdlPath, ".vvd");
+            if (File.Exists(vvdPath))
+                vvdData = File.ReadAllBytes(vvdPath);
+            else
+                Debug.LogWarning($"[MDL] VVD not found – flexes unavailable for {mdlPath}");
+
+            using var ms = new MemoryStream(mdldata);
+            return new MDLFile(ms, parseAnims, parseHitboxes);
+        }
+
+        public void SetIndices(int bp, int mdl, int lod, int mesh, List<int> idx)
+            => MDL_Bodyparts[bp].Models[mdl].IndicesPerLod[lod].Add(mesh, idx);
+
+        public void SetVertices(int bp, int mdl, int lod, int total, int start, mstudiovertex_t[] verts)
+        {
+            var dst = new mstudiovertex_t[total];
+            Array.Copy(verts, start, dst, 0, total);
+            MDL_Bodyparts[bp].Models[mdl].VerticesPerLod[lod] = dst;
+        }
+
+        public void LoadFlexData(uReader r)
+        {
+            if (vvdData == null)
+            {
+                Debug.LogWarning("[MDL] No VVD in memory – trying legacy MDL flex load");
+                LoadFlexFromBuffer(r, mdldata);
+                return;
+            }
+
+            using var vr = new uReader(new MemoryStream(vvdData));
+            LoadFlexFromBuffer(vr, vvdData);
+        }
+
+        void LoadFlexFromBuffer(uReader rd, byte[] buf)
+        {
+            long len = buf.Length;
+            rd.BaseStream.Position = Math.Clamp(MDL_Header.flexdesc_index, 0, len - 1);
+
+            int descCnt = Math.Max(0, MDL_Header.flexdesc_count);
+            MDL_FlexDescs = new mstudioflexdesc_t[descCnt];
+            for (int i = 0; i < descCnt; i++) rd.ReadType(ref MDL_FlexDescs[i]);
+
+            _flexNames = new string[descCnt];
+            _flexLookup = new List<Dictionary<int, Vector3>>(descCnt);
+            MDL_FlexAnims = new List<mstudiovertanim_t[]>(descCnt);
+
+            int strTbl = MDL_Header.flexdesc_index + descCnt * Marshal.SizeOf<mstudioflexdesc_t>();
+
+            for (int f = 0; f < descCnt; f++)
+            {
+                var d = MDL_FlexDescs[f];
+                int nPos = strTbl + d.szFACSindex;
+                int nLen = (nPos >= 0 && nPos < len) ? Math.Max(0, Array.IndexOf(buf, (byte)0, nPos) - nPos) : 0;
+                _flexNames[f] = nLen > 0 ? Encoding.UTF8.GetString(buf, nPos, nLen) : $"flex_{f}";
+
+                if (d.vertanim_count <= 0 || d.vertanim_offset <= 0 || d.vertanim_offset >= len)
+                {
+                    MDL_FlexAnims.Add(Array.Empty<mstudiovertanim_t>());
+                    _flexLookup.Add(new Dictionary<int, Vector3>());
+                    continue;
+                }
+
+                long off = Math.Clamp(d.vertanim_offset, 0, len - 1);
+                rd.BaseStream.Position = off;
+
+                int max = (int)((len - off) / Marshal.SizeOf<mstudiovertanim_t>());
+                int cnt = Math.Clamp(d.vertanim_count, 0, max);
+
+                var arr = new mstudiovertanim_t[cnt];
+                for (int v = 0; v < cnt; v++) rd.ReadType(ref arr[v]);
+                MDL_FlexAnims.Add(arr);
+
+                var dict = new Dictionary<int, Vector3>(cnt);
+                foreach (var va in arr) dict[va.index] = va.NormalDelta;
+                _flexLookup.Add(dict);
+            }
+        }
+
+        public Vector3 GetFlexDelta(int fi, int vi, float s)
+            => s == 0f || fi < 0 || fi >= _flexLookup.Count
+               ? Vector3.zero
+               : _flexLookup[fi].TryGetValue(vi, out var d) ? d * s : Vector3.zero;
+
+        public string GetFlexName(int i)
+            => (i >= 0 && i < _flexNames.Length) ? _flexNames[i] : $"flex_{i}";
+
+        public string GetFlexName(mstudioflexdesc_t d)
+            => GetFlexName(Array.IndexOf(MDL_FlexDescs, d));
+        Transform[] BuildBoneHierarchy(GameObject root)
+        {
+            Transform[] bones = new Transform[MDL_Header.bone_count];
+            for (int i = 0; i < bones.Length; i++)
+            {
+                Transform boneTransform = root.transform.Find(MDL_BoneNames[i]);
+                if (boneTransform == null)
+                {
+                    var go = new GameObject(MDL_BoneNames[i]);
+                    boneTransform = go.transform;
+                }
+                bones[i] = boneTransform;
+
+                var sb = MDL_StudioBones[i];
+                Vector3 p = sb.pos * uLoader.UnitScale;
+                p.x = -p.x;
+
+                if (sb.parent >= 0)
+                    bones[i].parent = bones[sb.parent];
+                else
+                {
+                    (p.y, p.z) = (p.z, -p.y);
+                    bones[i].parent = root.transform;
+                }
+                bones[i].localPosition = p;
+
+                Vector3 eul = sb.rot * Mathf.Rad2Deg;
+                bones[i].localRotation = sb.parent == -1
+                    ? Quaternion.Euler(-90, 90, -90) * MathLibrary.AngleQuaternion(eul)
+                    : MathLibrary.AngleQuaternion(eul);
+            }
+
+            if (uLoader.DrawArmature)
+                root.AddComponent<MDLArmatureInfo>().boneNodes = bones;
+            return bones;
+        }
+
+
+        void BuildHitboxes(Transform[] bones)
+        {
+            if (Hitboxes == null) return;
+            foreach (var set in Hitboxes)
+                foreach (var hb in set)
+                {
+                    var bb = hb.BBox;
+                    var bc = new GameObject($"Hitbox_{bones[bb.bone].name}")
+                               .AddComponent<BoxCollider>();
+
+                    bc.size = MathLibrary.NegateX(bb.bbmax - bb.bbmin) * uLoader.UnitScale;
+                    bc.center = MathLibrary.NegateX((bb.bbmax + bb.bbmin) / 2f) * uLoader.UnitScale;
+                    bc.transform.parent = bones[bb.bone];
+                    bc.transform.localPosition = Vector3.zero;
+                    bc.transform.localRotation = Quaternion.identity;
+                }
+        }
+        [Serializable]
+        public struct MdlEventInfo
+        {
+            public float time;
+            public int type;
+            public string options;
+        }
+
+        [DisallowMultipleComponent]
+        public class JiggleBone : MonoBehaviour
+        {
+            public Transform tip;
+            public float stiffness = 180f;
+            public float damping = 0.75f;
+            public Vector3 localRestPos;
+
+            private Vector3 _prevPos;
+
+            void Awake()
+            {
+                if (tip == null) tip = transform;
+                _prevPos = tip.position;
+                localRestPos = tip.localPosition;
+            }
+
+            void LateUpdate()
+            {
+                Vector3 currentPos = tip.position;
+                Vector3 wantedPos = transform.TransformPoint(localRestPos);
+                Vector3 velocity = currentPos - _prevPos;
+
+                Vector3 force = (wantedPos - currentPos) * stiffness * Time.deltaTime * Time.deltaTime;
+                velocity += force;
+                velocity *= 1f - damping * Time.deltaTime;
+
+                Vector3 nextPos = currentPos + velocity;
+                tip.position = nextPos;
+                tip.rotation = transform.rotation;
+
+                _prevPos = currentPos;
+            }
+        }
+
+        [DisallowMultipleComponent]
+        public class EyeController : MonoBehaviour
+        {
+            public Transform leftEye;
+            public Transform rightEye;
+            public Transform target;
+            public float eyeSpeed = 15f;
+
+            void LateUpdate()
+            {
+                if (leftEye == null && rightEye == null) return;
+                Transform t = target ?? Camera.main?.transform;
+                if (t == null) return;
+
+                Vector3 lookPos = t.position;
+
+                void RotateEye(Transform eye)
+                {
+                    Vector3 dir = lookPos - eye.position;
+                    if (dir.sqrMagnitude < 0.0001f) return;
+                    Quaternion desired = Quaternion.LookRotation(dir, transform.up);
+                    eye.rotation = Quaternion.Slerp(eye.rotation, desired, Time.deltaTime * eyeSpeed);
+                }
+
+                if (leftEye) RotateEye(leftEye);
+                if (rightEye) RotateEye(rightEye);
+            }
+        }
+
+        [DisallowMultipleComponent]
+        public class MdlEventPlayer : MonoBehaviour
+        {
+            public event Action<MdlEventInfo> OnMdlEvent;
+
+            public void Fire(int type, string options)
+            {
+                OnMdlEvent?.Invoke(new MdlEventInfo
+                {
+                    time = Time.time,
+                    type = type,
+                    options = options
+                });
+            }
+        }
+
+        void BuildEyeballs(Transform root, Transform[] bones)
+        {
+            if (MDL_Eyeballs == null || MDL_Eyeballs.Length == 0) return;
+
+            var ec = root.GetComponent<EyeController>() ?? root.gameObject.AddComponent<EyeController>();
+            int eyeballSize = Marshal.SizeOf<mstudioeyeball_t>();
+
+            for (int i = 0; i < MDL_Eyeballs.Length; ++i)
+            {
+                var eye = MDL_Eyeballs[i];
+                Vector3 src = eye.org;
+                if (!IsFinite(src))
+                {
+                    Debug.LogWarning($"[MDL] Eyeball #{i} ma nieprawidłowe org → pomijam.");
+                    continue;
+                }
+
+                Vector3 pos = MathLibrary.SwapZY(MathLibrary.NegateX(src) * uLoader.UnitScale);
+                if (!IsFinite(pos) || pos.magnitude > 1000f)
+                {
+                    Debug.LogWarning($"[MDL] Eyeball #{i} org={pos} poza zakresem → pomijam.");
+                    continue;
+                }
+
+                Transform bone = (eye.bone >= 0 && eye.bone < bones.Length) ? bones[eye.bone] : root;
+                var go = new GameObject($"Eyeball_{bone.name}_{i}");
+                go.transform.SetParent(bone, false);
+                go.transform.localPosition = pos;
+                go.transform.localRotation = Quaternion.identity;
+
+                string name = GetEyeballNameSafe(i, eye.sznameindex, eyeballSize).ToLowerInvariant();
+                if (ec.leftEye == null && (name.Contains("left") || name.Contains("_l"))) ec.leftEye = go.transform;
+                else if (ec.rightEye == null && (name.Contains("right") || name.Contains("_r"))) ec.rightEye = go.transform;
+                else if (ec.leftEye == null) ec.leftEye = go.transform;
+                else if (ec.rightEye == null) ec.rightEye = go.transform;
+            }
+
+            static bool IsFinite(Vector3 v) =>
+                !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) ||
+                  float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));
+
+            string GetEyeballNameSafe(int idx, int relOffset, int structSize)
+            {
+                long abs = MDL_Header.eyeball_offset + idx * structSize + relOffset;
+                return GetCStringSafe((int)abs);
+            }
+        }
+
+        static string GetCStringSafe(int ptr)
+        {
+            if (ptr < 0 || ptr >= mdldata.Length) return string.Empty;
+            int end = Array.IndexOf(mdldata, (byte)0, ptr);
+            if (end < 0) end = mdldata.Length;
+            int len = end - ptr;
+            return len > 0 ? Encoding.UTF8.GetString(mdldata, ptr, len) : string.Empty;
+        }
+
+        void BuildJiggleBones(Transform[] bones, Transform root)
+        {
+            if (MDL_JiggleBones == null) return;
+            foreach (var jb in MDL_JiggleBones)
+            {
+                if (jb.bone < 0 || jb.bone >= bones.Length) continue;
+                Transform t = bones[jb.bone];
+                var jiggle = t.gameObject.AddComponent<JiggleBone>();
+                jiggle.localRestPos = Vector3.zero;
+                jiggle.stiffness = Mathf.Clamp(jb.Stiffness, 10, 900);
+                jiggle.damping = Mathf.Clamp01(jb.yawDamping);
+            }
+        }
+
+        private static readonly (string left, string right)[] _symPairs =
+        {
+            ("Smile_L", "Smile_R"),
+            ("Blink_L", "Blink_R"),
+            ("CheekPuff_L", "CheekPuff_R"),
+            ("BrowRaise_L", "BrowRaise_R"),
+            ("Frown_L", "Frown_R"),
+            ("Squint_L", "Squint_R")
+        };
+
+        bool AddBlendshapesFromFlex(Mesh mesh, mstudiovertex_t[] verts, int baseOfs)
+        {
+            int vc = verts.Length;
+            bool any = false;
+            for (int fi = 0; fi < MDL_FlexDescs.Length; fi++)
+            {
+                string fname = GetFlexName(fi);
+                if (mesh.GetBlendShapeIndex(fname) != -1) continue;
+
+                var dV = new Vector3[vc];
+                var dN = new Vector3[vc];
+                bool thisAny = false;
+
+                foreach (var va in MDL_FlexAnims[fi])
+                {
+                    int globalIdx = va.index;
+                    int localIdx = globalIdx - baseOfs;
+                    if ((uint)localIdx >= (uint)vc) continue;
+                    if (va.PositionDelta.sqrMagnitude < 1e-10f &&
+                        va.NormalDelta.sqrMagnitude < 1e-10f) continue;
+
+                    dV[localIdx] = MathLibrary.SwapZY(va.PositionDelta * uLoader.UnitScale);
+                    dN[localIdx] = MathLibrary.SwapZY(va.NormalDelta);
+                    thisAny = true;
+                }
+
+                if (thisAny)
+                {
+                    mesh.AddBlendShapeFrame(fname, 100f, dV, dN, null);
+                    any = true;
+                }
+            }
+            return any;
+        }
+        private void BuildAdvancedBlendshapes(Mesh mesh)
+        {
+            int vCount = mesh.vertexCount;
+            var dv = new Vector3[vCount];
+            var dn = new Vector3[vCount];
+            var tmp = new Vector3[vCount];
+            var dL = new Vector3[vCount];
+            var nL = new Vector3[vCount];
+            var dR = new Vector3[vCount];
+            var nR = new Vector3[vCount];
+
+            foreach (var (left, right) in _symPairs)
+            {
+                int iL = mesh.GetBlendShapeIndex(left);
+                int iR = mesh.GetBlendShapeIndex(right);
+                if (iL == -1 && iR == -1) continue;
+
+                Array.Clear(dv,iL,iR);
+                Array.Clear(dn,iL,iR);
+
+                if (iL != -1) mesh.GetBlendShapeFrameVertices(iL, 0, dL, nL, tmp);
+                if (iR != -1) mesh.GetBlendShapeFrameVertices(iR, 0, dR, nR, tmp);
+
+                string both = left.TrimEnd('_', 'L');
+                if (mesh.GetBlendShapeIndex(both) == -1)
+                {
+                    for (int v = 0; v < vCount; ++v)
+                    {
+                        Vector3 leftv = iL != -1 ? dL[v] : Vector3.zero;
+                        Vector3 rightv = iR != -1 ? MirrorX(dR[v]) : Vector3.zero;
+                        dv[v] = (leftv + rightv) * .5f;
+
+                        Vector3 leftn = iL != -1 ? nL[v] : Vector3.zero;
+                        Vector3 rightn = iR != -1 ? MirrorX(nR[v]) : Vector3.zero;
+                        dn[v] = (leftn + rightn) * .5f;
+                    }
+                    Sanitize(dv, mesh);
+                    mesh.AddBlendShapeFrame(both, 100f, dv, dn, null);
+                }
+
+                if (iL == -1 && iR != -1)
+                {
+                    for (int v = 0; v < vCount; ++v)
+                    {
+                        dv[v] = MirrorX(dR[v]);
+                        dn[v] = MirrorX(nR[v]);
+                    }
+                    Sanitize(dv, mesh);
+                    mesh.AddBlendShapeFrame(left, 100f, dv, dn, null);
+                }
+                else if (iR == -1 && iL != -1)
+                {
+                    for (int v = 0; v < vCount; ++v)
+                    {
+                        dv[v] = dL[v];
+                        dn[v] = nL[v];
+                    }
+                    Sanitize(dv, mesh);
+                    mesh.AddBlendShapeFrame(right, 100f, dv, dn, null);
+                }
+            }
+
+            mesh.RecalculateNormals();
+            var neighbours = BuildAdjacency(mesh);
+            var maxEdge = CacheMaxEdgeLengths(mesh, neighbours);
+
+            // Gładkie warianty
+            for (int bs = 0, cnt = mesh.blendShapeCount; bs < cnt; ++bs)
+            {
+                string name = mesh.GetBlendShapeName(bs);
+                if (name.StartsWith("_")) continue;
+
+                mesh.GetBlendShapeFrameVertices(bs, 0, dv, dn, tmp);
+                for (int v = 0; v < vCount; ++v)
+                {
+                    Vector3 sum = Vector3.zero;
+                    foreach (int n in neighbours[v])
+                        sum += dv[n];
+                    dv[v] = (dv[v] + sum / neighbours[v].Count) * .5f;
+                }
+                Sanitize(dv, maxEdge);
+                mesh.AddBlendShapeFrame($"_{name}_smooth", 100f, dv, dn, null);
+            }
+
+            static Vector3 MirrorX(Vector3 v) => new(-v.x, v.y, v.z);
+        }
+        Transform GetOrCreateChild(Transform parent, string name)
+        {
+            var existing = parent.Find(name);
+            if (existing != null) return existing;
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            return go.transform;
+        }
+
+
+        static void Sanitize(Vector3[] delta, Mesh m, Dictionary<string, (List<int>[] neighbours, float[] maxEdge)> cache = null)
+        {
+            var verts = m.vertices;
+            int vCount = verts.Length;
+
+            // cache key można np. bazować na mesh.GetInstanceID()
+            List<int>[] neighbours;
+            float[] maxEdge;
+
+            if (cache != null && cache.TryGetValue(m.GetInstanceID().ToString(), out var cached))
+            {
+                neighbours = cached.neighbours;
+                maxEdge = cached.maxEdge;
+            }
+            else
+            {
+                neighbours = BuildAdjacency(m);
+                maxEdge = CacheMaxEdgeLengths(m, neighbours);
+                cache?.Add(m.GetInstanceID().ToString(), (neighbours, maxEdge));
+            }
+
+            // grupowanie podobnych wierzchołków (quantize) bez tworzenia nowych tuple’ów na każde wywołanie
+            var buckets = new Dictionary<long, List<int>>(vCount);
+            for (int i = 0; i < vCount; ++i)
+            {
+                long key = QuantizeKey(verts[i]);
+                if (!buckets.TryGetValue(key, out var list))
+                {
+                    list = new List<int>(2);
+                    buckets[key] = list;
+                }
+                list.Add(i);
+            }
+
+            foreach (var kv in buckets.Values)
+            {
+                if (kv.Count < 2) continue;
+                Vector3 avg = Vector3.zero;
+                foreach (int idx in kv) avg += delta[idx];
+                avg /= kv.Count;
+                foreach (int idx in kv) delta[idx] = avg;
+            }
+
+            for (int v = 0; v < delta.Length; ++v)
+            {
+                float max = maxEdge[v] * .95f;
+                float mag = delta[v].magnitude;
+                if (mag > max) delta[v] *= max / mag;
+            }
+
+            static long QuantizeKey(Vector3 p)
+            {
+                // 3 składowe packujemy do jednego longa: po 21 bitów na każdą (przy założeniu, że wartości nie są ekstremalne)
+                int x = (int)(p.x * 10000f);
+                int y = (int)(p.y * 10000f);
+                int z = (int)(p.z * 10000f);
+                return ((long)(x & 0x1FFFFF) << 42) | ((long)(y & 0x1FFFFF) << 21) | (long)(z & 0x1FFFFF);
+            }
+        }
+
+
+        static void Sanitize(Vector3[] delta, float[] maxMove)
+        {
+            for (int v = 0; v < delta.Length && v < maxMove.Length; ++v)
+            {
+                float max = maxMove[v] * 0.95f;
+                float mag = delta[v].magnitude;
+                if (mag > max) delta[v] *= max / mag;
+            }
+        }
+        static List<int>[] BuildAdjacency(Mesh m)
+        {
+            int vCount = m.vertexCount;
+            var adj = new List<int>[vCount];
+            for (int i = 0; i < vCount; ++i)
+                adj[i] = new List<int>(6);
+
+            var tris = m.triangles;
+            for (int t = 0; t < tris.Length; t += 3)
+            {
+                int a = tris[t], b = tris[t + 1], c = tris[t + 2];
+                AddEdge(a, b);
+                AddEdge(a, c);
+                AddEdge(b, c);
+            }
+
+            void AddEdge(int x, int y)
+            {
+                var listX = adj[x];
+                if (listX.Count == 0 || listX[listX.Count - 1] != y) // szybki check bez Contains
+                {
+                    if (!listX.Contains(y)) // rzadko się odpala bo są krótkie listy
+                        listX.Add(y);
+                }
+                var listY = adj[y];
+                if (listY.Count == 0 || listY[listY.Count - 1] != x)
+                {
+                    if (!listY.Contains(x))
+                        listY.Add(x);
+                }
+            }
+
+            return adj;
+        }
+
+        static float[] CacheMaxEdgeLengths(Mesh m, List<int>[] adj)
+        {
+            var verts = m.vertices;
+            int vCount = verts.Length;
+            var max = new float[vCount];
+            for (int v = 0; v < vCount; ++v)
+            {
+                float best = 0f;
+                foreach (int n in adj[v])
+                {
+                    float d = (verts[v] - verts[n]).magnitude;
+                    if (d > best) best = d;
+                }
+                max[v] = best;
+            }
+            return max;
+        }
+
+
+        void CloneFlexToLOD(Mesh src, Mesh dst, ushort[] remap)
+        {
+            if (src == null || dst == null || remap == null || remap.Length == 0) return;
+
+            int srcBSCount = src.blendShapeCount;
+            if (srcBSCount == 0) return;
+
+            int dstVC = dst.vertexCount;
+            var tmp = new Vector3[Mathf.Max(src.vertexCount, dstVC)];
+
+            for (int shapeIndex = 0; shapeIndex < srcBSCount; shapeIndex++)
+            {
+                string shapeName = src.GetBlendShapeName(shapeIndex);
+                if (dst.GetBlendShapeIndex(shapeName) != -1)
+                    continue;
+
+                int frameCount = src.GetBlendShapeFrameCount(shapeIndex);
+                for (int frame = 0; frame < frameCount; frame++)
+                {
+                    float weight = src.GetBlendShapeFrameWeight(shapeIndex, frame);
+
+                    var srcDV = new Vector3[src.vertexCount];
+                    var srcDN = new Vector3[src.vertexCount];
+                    src.GetBlendShapeFrameVertices(shapeIndex, frame, srcDV, srcDN, tmp);
+
+                    var dstDV = new Vector3[dstVC];
+                    var dstDN = new Vector3[dstVC];
+                    for (int v = 0; v < dstVC; v++)
+                    {
+                        if (v >= remap.Length) continue;
+                        int srcIdx = remap[v];
+                        if (srcIdx >= 0 && srcIdx < srcDV.Length)
+                        {
+                            dstDV[v] = srcDV[srcIdx];
+                            dstDN[v] = srcDN[srcIdx];
+                        }
+                    }
+
+                    dst.AddBlendShapeFrame(shapeName, weight, dstDV, dstDN, null);
+                }
+            }
+
+            dst.RecalculateBounds();
+        }
+
+        private static BoneWeight GetBoneWeightSafe(mstudioboneweight_t src)
+        {
+            int[] b = new int[4];
+            float[] w = new float[4];
+
+            b[0] = src.bone[0];
+            b[1] = src.bone[1];
+            b[2] = src.bone[2];
+            b[3] = 0;
+
+            w[0] = src.weight[0];
+            w[1] = src.weight[1];
+            w[2] = src.weight[2];
+            w[3] = Mathf.Max(0f, 1f - (w[0] + w[1] + w[2]));
+
+            Array.Sort(w, b);
+            Array.Reverse(w);
+            Array.Reverse(b);
+
+            float sum = w[0] + w[1] + w[2] + w[3];
+            if (sum > 0f)
+            {
+                float inv = 1f / sum;
+                for (int i = 0; i < 4; i++) w[i] *= inv;
+            }
+            else
+            {
+                w[0] = 1f; w[1] = w[2] = w[3] = 0f;
+            }
+
+            return new BoneWeight
+            {
+                boneIndex0 = b[0],
+                weight0 = w[0],
+                boneIndex1 = b[1],
+                weight1 = w[1],
+                boneIndex2 = b[2],
+                weight2 = w[2],
+                boneIndex3 = b[3],
+                weight3 = w[3]
+            };
+        }
+
+        private Vector3 ConvertSourcePosition(Vector3 src, bool isRoot)
+        {
+            Vector3 p = src * uLoader.UnitScale;
+            p.x = -p.x;
+            if (isRoot) (p.y, p.z) = (p.z, -p.y);
+            return MathLibrary.SwapZY(p);
+        }
+
+        private Quaternion ConvertSourceRotation(Quaternion src, bool isRoot)
+        {
+            Quaternion q = src;
+            if (isRoot) q = Quaternion.Euler(-90, 90, -90) * q;
+            return q;
+        }
+
+        void SetupAnimatorAndClips(GameObject root, Transform[] bones)
+        {
+            Dictionary<Int32, String> bonePathDict = new Dictionary<Int32, String>();
+            Animator animatorComponent = root.GetComponent<Animator>();
+            if (animatorComponent == null)
+            {
+                Debug.LogWarning($"Animator component missing on {root.name}. Adding one.");
+                animatorComponent = root.AddComponent<Animator>();
+            }
+
+            const string controllerDir = "Assets/GeneratedAnimatorControllers";
+            if (!Directory.Exists(controllerDir))
+                Directory.CreateDirectory(controllerDir);
+            AssetDatabase.Refresh();
+
+            string cleanName = $"{root.name}_{Guid.NewGuid()}".Replace(".", "_").Replace("/", "_").Replace("\\", "_");
+            string controllerPath = $"{controllerDir}/{cleanName}_AnimatorController.controller";
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+
+            if (controller.layers.Length == 0)
+                controller.AddLayer(new AnimatorControllerLayer { name = "Base Layer", stateMachine = new AnimatorStateMachine() });
+
+            var stateMachine = controller.layers[0].stateMachine;
+            animatorComponent.runtimeAnimatorController = controller;
+
+            const string exportDir = "Assets/ExportedAnimations";
+            if (!Directory.Exists(exportDir))
+                Directory.CreateDirectory(exportDir);
+
+            for (int i = 0; i < MDL_Header.bone_count; i++)
+                bonePathDict[i] = GetBonePath(i);
+
+            foreach (var seq in Sequences)
+            {
+                if (seq.ani == null) continue;
+
+                foreach (var ani in seq.ani)
+                {
+                    var clip = CreateAnimationClip(ani, bonePathDict);
+                    clip.name = ani.name.Replace(" ", "_");
+
+                    var state = stateMachine.AddState(clip.name);
+                    state.motion = clip;
+
+                    string p = clip.name;
+
+                    if (controller.parameters.All(x => x.name != $"{p}_Bool"))
+                        controller.AddParameter($"{p}_Bool", AnimatorControllerParameterType.Bool);
+                    if (controller.parameters.All(x => x.name != $"{p}_Trigger"))
+                        controller.AddParameter($"{p}_Trigger", AnimatorControllerParameterType.Trigger);
+                    if (controller.parameters.All(x => x.name != $"{p}_Float"))
+                        controller.AddParameter($"{p}_Float", AnimatorControllerParameterType.Float);
+                    if (controller.parameters.All(x => x.name != $"{p}_Int"))
+                        controller.AddParameter($"{p}_Int", AnimatorControllerParameterType.Int);
+
+                    AnimatorStateTransition t;
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.If, 0, $"{p}_Bool");
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.IfNot, 0, $"{p}_Bool");
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.If, 0, $"{p}_Trigger");
+                    const float floatThreshold = 0.5f;
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.Greater, floatThreshold, $"{p}_Float");
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.Less, floatThreshold, $"{p}_Float");
+                    const int intValue = 1;
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.Equals, intValue, $"{p}_Int");
+                    t = stateMachine.AddAnyStateTransition(state);
+                    t.hasExitTime = false; t.duration = 0f; t.AddCondition(AnimatorConditionMode.NotEqual, intValue, $"{p}_Int");
+
+#if UNITY_EDITOR
+                    string desiredPath = $"{exportDir}/{clip.name}.anim";
+                    string uniquePath = AssetDatabase.GenerateUniqueAssetPath(desiredPath);
+                    AssetDatabase.CreateAsset(clip, uniquePath);
+                    AssetDatabase.SaveAssets();
+#endif
+                    Debug.Log($"AnimationClip '{clip.name}' exported to {exportDir}");
+                }
+
+#if UNITY_EDITOR
+                Avatar avatar = null;
+                bool isHumanoid =
+                    MDL_BoneNames.Any(b => b.Equals("ValveBiped.Hips", StringComparison.OrdinalIgnoreCase)) &&
+                    MDL_BoneNames.Any(b => b.Equals("ValveBiped.Head", StringComparison.OrdinalIgnoreCase));
+
+                if (isHumanoid)
+                {
+                    avatar = AvatarBuilder.BuildHumanAvatar(root, Hu(root, MDL_BoneNames));
+                }
+                else
+                {
+                    avatar = AvatarBuilder.BuildGenericAvatar(root, root.name);
+                }
+
+                animatorComponent.avatar = avatar;
+#if UNITY_EDITOR
+                avatar = AvatarBuilder.BuildGenericAvatar(root, MDL_BoneNames[0]);
+                animatorComponent.avatar = avatar;
+#endif
+                Debug.Log($"{root.name} - Avatar built ({(isHumanoid ? "Humanoid" : "Generic")})");
+#endif
+            }
+
+            Debug.Log($"AnimatorController + wszystkie warunki skonfigurowane dla {root.name}");
+
+            if (animatorComponent.runtimeAnimatorController != null)
+                animatorComponent.runtimeAnimatorController = Object.Instantiate(animatorComponent.runtimeAnimatorController);
+
+            string GetBonePath(int idx)
+            {
+                var seg = new List<string>();
+                for (int c = idx; c != -1; c = MDL_StudioBones[c].parent) seg.Add(MDL_BoneNames[c]);
+                seg.Reverse();
+                return string.Join("/", seg);
+            }
+        }
+
+        public AnimationClip CreateAnimationClip(AniInfo animationData, Dictionary<int, string> bonePathDict)
+        {
+            int numFrames = animationData.studioAnim.numframes < 2
+                ? animationData.studioAnim.numframes + 1
+                : animationData.studioAnim.numframes;
+            AnimationClip clip = new AnimationClip { legacy = false };
+
+            AnimationCurve[] posX = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] posY = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] posZ = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] rotX = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] rotY = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] rotZ = new AnimationCurve[MDL_Header.bone_count];
+            AnimationCurve[] rotW = new AnimationCurve[MDL_Header.bone_count];
+            for (int i = 0; i < MDL_Header.bone_count; i++)
+            {
+                posX[i] = new AnimationCurve();
+                posY[i] = new AnimationCurve();
+                posZ[i] = new AnimationCurve();
+                rotX[i] = new AnimationCurve();
+                rotY[i] = new AnimationCurve();
+                rotZ[i] = new AnimationCurve();
+                rotW[i] = new AnimationCurve();
+            }
+
+            for (int frame = 0; frame < numFrames; frame++)
+            {
+                for (int bone = 0; bone < MDL_Header.bone_count; bone++)
+                {
+                    posX[bone].AddKey(animationData.PosX[frame][bone]);
+                    posY[bone].AddKey(animationData.PosY[frame][bone]);
+                    posZ[bone].AddKey(animationData.PosZ[frame][bone]);
+                    rotX[bone].AddKey(animationData.RotX[frame][bone]);
+                    rotY[bone].AddKey(animationData.RotY[frame][bone]);
+                    rotZ[bone].AddKey(animationData.RotZ[frame][bone]);
+                    rotW[bone].AddKey(animationData.RotW[frame][bone]);
+                }
+            }
+
+            for (int bone = 0; bone < MDL_Header.bone_count; bone++)
+            {
+                string bonePath = bonePathDict[bone];
+                if (string.IsNullOrEmpty(bonePath)) continue;
+
+                clip.SetCurve(bonePath, typeof(Transform), "localPosition.x", posX[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localPosition.y", posY[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localPosition.z", posZ[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localRotation.x", rotX[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localRotation.y", rotY[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localRotation.z", rotZ[bone]);
+                clip.SetCurve(bonePath, typeof(Transform), "localRotation.w", rotW[bone]);
+            }
+
+            if (animationData.studioAnim.fps > 0f)
+                clip.frameRate = animationData.studioAnim.fps;
+
+            clip.EnsureQuaternionContinuity();
+            return clip;
+        }
+
+        private Material FindMaterialForMesh(int sub, StudioModel mdl)
+        {
+            for (int d = 0; d < MDL_TDirectories.Length; d++)
+            {
+                string p = MDL_TDirectories[d] + MDL_Textures[mdl.Meshes[sub].material];
+                if (uResourceManager.ContainsFile(p, uResourceManager.MaterialsSubFolder,
+                                                     uResourceManager.MaterialsExtension[0]))
+                    return uResourceManager.LoadMaterial(p).Material;
+            }
+            return uResourceManager.LoadMaterial(string.Empty).Material;
+        }
+
+#if UNITY_EDITOR
+        public static HumanDescription Hu(GameObject root, string[] mdlNames)
+        {
+            var hList = new List<HumanBone>();
+            var sList = new List<SkeletonBone>();
+
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                string src = t.name;
+                if (TryMap(src, out string dst))
+                    hList.Add(new HumanBone
+                    {
+                        boneName = src,
+                        humanName = dst,
+                        limit = new HumanLimit { useDefaultValues = true }
+                    });
+                sList.Add(new SkeletonBone
+                {
+                    name = src,
+                    position = t.localPosition,
+                    rotation = t.localRotation,
+                    scale = t.localScale
+                });
+            }
+            Ensure("ValveBiped.Bip01_Pelvis", HumanBodyBones.Hips.ToString());
+            Ensure("ValveBiped.Bip01_Head1", HumanBodyBones.Head.ToString());
+
+            return new HumanDescription
+            {
+                human = hList.ToArray(),
+                skeleton = sList.ToArray(),
+                armStretch = .05f,
+                legStretch = .05f,
+                upperArmTwist = .5f,
+                lowerArmTwist = .5f,
+                upperLegTwist = .5f,
+                lowerLegTwist = .5f,
+                feetSpacing = 0,
+                hasTranslationDoF = false
+            };
+
+            void Ensure(string src, string dst)
+            {
+                if (hList.Any(b => b.humanName == dst)) return;
+                if (!mdlNames.Contains(src)) return;
+                hList.Add(new HumanBone
+                {
+                    boneName = src,
+                    humanName = dst,
+                    limit = new HumanLimit { useDefaultValues = true }
+                });
+            }
+        }
+
+        static bool TryMap(string valve, out string unity)
+        {
+            unity = SourceToUnityHumanoidName(valve);
+            return !string.IsNullOrEmpty(unity);
+        }
+
+        public static string SourceToUnityHumanoidName(string n) => n switch
+        {
+            "ValveBiped.Bip01_Pelvis" => HumanBodyBones.Hips.ToString(),
+            "ValveBiped.Bip01_Spine" => HumanBodyBones.Spine.ToString(),
+            "ValveBiped.Bip01_Spine1" => HumanBodyBones.Chest.ToString(),
+            "ValveBiped.Bip01_Spine2" => HumanBodyBones.UpperChest.ToString(),
+            "ValveBiped.Bip01_Neck1" => HumanBodyBones.Neck.ToString(),
+            "ValveBiped.Bip01_Head1" => HumanBodyBones.Head.ToString(),
+            "ValveBiped.Bip01_L_Clavicle" => HumanBodyBones.LeftShoulder.ToString(),
+            "ValveBiped.Bip01_L_UpperArm" => HumanBodyBones.LeftUpperArm.ToString(),
+            "ValveBiped.Bip01_L_Forearm" => HumanBodyBones.LeftLowerArm.ToString(),
+            "ValveBiped.Bip01_L_Hand" => HumanBodyBones.LeftHand.ToString(),
+            "ValveBiped.Bip01_R_Clavicle" => HumanBodyBones.RightShoulder.ToString(),
+            "ValveBiped.Bip01_R_UpperArm" => HumanBodyBones.RightUpperArm.ToString(),
+            "ValveBiped.Bip01_R_Forearm" => HumanBodyBones.RightLowerArm.ToString(),
+            "ValveBiped.Bip01_R_Hand" => HumanBodyBones.RightHand.ToString(),
+            "ValveBiped.Bip01_L_Thigh" => HumanBodyBones.LeftUpperLeg.ToString(),
+            "ValveBiped.Bip01_L_Calf" => HumanBodyBones.LeftLowerLeg.ToString(),
+            "ValveBiped.Bip01_L_Foot" => HumanBodyBones.LeftFoot.ToString(),
+            "ValveBiped.Bip01_L_Toe0" => HumanBodyBones.LeftToes.ToString(),
+            "ValveBiped.Bip01_R_Thigh" => HumanBodyBones.RightUpperLeg.ToString(),
+            "ValveBiped.Bip01_R_Calf" => HumanBodyBones.RightLowerLeg.ToString(),
+            "ValveBiped.Bip01_R_Foot" => HumanBodyBones.RightFoot.ToString(),
+            "ValveBiped.Bip01_R_Toe0" => HumanBodyBones.RightToes.ToString(),
+            _ => null
+        };
+#endif
+
+        void ReadMdlEvents()
+        {
+            if (MDL_SeqDescriptions == null) return;
+            var list = new List<mstudioevent_t>();
+            using var ms = new MemoryStream(mdldata, false);
+            using var r = new uReader(ms);
+            int sz = Marshal.SizeOf<mstudioevent_t>();
+
+            for (int s = 0; s < MDL_SeqDescriptions.Length; s++)
+            {
+                var sd = MDL_SeqDescriptions[s];
+                if (sd.numevents == 0) continue;
+                long baseOff = MDL_Header.localseq_offset + 212 * s;
+                for (int e = 0; e < sd.numevents && list.Count < 1000; e++)
+                {
+                    var ev = new mstudioevent_t();
+                    r.ReadTypeFixed(ref ev, sz, (int)(baseOff + sd.eventindex + e * sz));
+                    list.Add(ev);
+                }
+            }
+            MDL_Events = list.ToArray();
+        }
+
+        public Transform BuildModel(bool generateUV2 = false)
+        {
+            if (MDL_FlexAnims == null)
+            {
+                using var ms = new MemoryStream(mdldata);
+                using var rd = new uReader(ms);
+                LoadFlexData(rd);
+            }
+
+            string raw = string.IsNullOrEmpty(MDL_Header.Name) ? "MDL_Model" : MDL_Header.Name;
+            string clean = Path.GetFileNameWithoutExtension(raw)
+                            .Replace('\\', '_')
+                            .Replace('/', '_')
+                            .Replace(':', '_')
+                            .Replace('*', '_')
+                            .Replace('?', '_')
+                            .Replace('"', '_')
+                            .Replace('<', '_')
+                            .Replace('>', '_')
+                            .Replace('|', '_');
+            var modelGO = new GameObject(clean);
+            Transform[] bones = BuildBoneHierarchy(modelGO);
+
+            if (MDL_Hitboxsets != null) BuildHitboxes(bones);
+            if (MDL_Eyeballs != null && MDL_Eyeballs.Length > 0) BuildEyeballs(modelGO.transform, bones);
+            if (MDL_JiggleBones != null && MDL_JiggleBones.Length > 0) BuildJiggleBones(bones, modelGO.transform);
+
+            bool staticProp = MDL_Header.flags.HasFlag(StudioHDRFlags.STUDIOHDR_FLAGS_STATIC_PROP);
+            var mdlEventPlayer = modelGO.GetComponent<MdlEventPlayer>() ?? modelGO.AddComponent<MdlEventPlayer>();
+            if (OnPhonemeEvent != null)
+                mdlEventPlayer.OnMdlEvent += info => OnPhonemeEvent(modelGO, info.options);
+
+            for (int bp = 0; bp < MDL_Header.bodypart_count; bp++)
+            {
+                foreach (var mdl in MDL_Bodyparts[bp].Models)
+                {
+                    if (mdl.isBlank) continue;
+
+                    bool willBeSkinned = !staticProp;
+                    bool detail = uLoader.DetailMode != DetailMode.None;
+                    bool lodEnable = uLoader.EnableLODParsing && !detail && mdl.NumLODs > 1;
+
+                    int startLOD = detail ? uLoader.DetailMode switch
+                    {
+                        DetailMode.Lowest => mdl.NumLODs - 1,
+                        DetailMode.Low => Mathf.FloorToInt(mdl.NumLODs / 1.5f),
+                        DetailMode.Medium => mdl.NumLODs / 2,
+                        DetailMode.High => Mathf.FloorToInt(mdl.NumLODs / 2.5f),
+                        _ => 0
+                    } : 0;
+
+                    float maxSwitch = 100f;
+                    if (lodEnable)
+                    {
+                        for (int c = 1; c < 3; c++)
+                        {
+                            var ld = mdl.LODData[mdl.NumLODs - c];
+                            if (ld.switchPoint >= 0)
+                            {
+                                maxSwitch = (ld.switchPoint > 0 ? ld.switchPoint : maxSwitch)
+                                          + maxSwitch * uLoader.NegativeAddLODPrecent
+                                          + uLoader.ThresholdMaxSwitch;
+                                break;
+                            }
+                        }
+                    }
+
+                    var lodEntries = new List<(float height, Renderer renderer)>();
+                    Mesh baseBlendshapeMesh = null;
+
+                    for (int lod = startLOD; lod < mdl.NumLODs; lod++)
+                    {
+                        var vs = mdl.VerticesPerLod[lod];
+                        if (vs == null || vs.Length == 0) continue;
+
+                        int vc = vs.Length;
+                        Vector3[] pos = new Vector3[vc];
+                        Vector3[] nor = new Vector3[vc];
+                        Vector2[] uv = new Vector2[vc];
+                        BoneWeight[] bw = new BoneWeight[vc];
+
+                        for (int v = 0; v < vc; v++)
+                        {
+                            pos[v] = MathLibrary.SwapZY(vs[v].m_vecPosition * uLoader.UnitScale);
+                            nor[v] = MathLibrary.SwapZY(vs[v].m_vecNormal);
+                            var t = vs[v].m_vecTexCoord;
+                            if (uLoader.SaveAssetsToUnity && uLoader.ExportTextureAsPNG) t.y = 1 - t.y;
+                            uv[v] = t;
+                            bw[v] = GetBoneWeightSafe(vs[v].m_BoneWeights);
+                        }
+
+                        string baseName = Path.GetFileNameWithoutExtension(mdl.Model.Name)
+                                                  .Trim('.', '_').Replace(" ", "_");
+                        foreach (char c in Path.GetInvalidFileNameChars()) baseName = baseName.Replace(c, '_');
+                        if (string.IsNullOrEmpty(baseName)) baseName = "Mesh";
+                        string meshName = $"{baseName}_LOD{lod}";
+
+                        var mesh = new Mesh { name = meshName };
+                        mesh.subMeshCount = mdl.Model.nummeshes;
+                        mesh.vertices = pos;
+                        mesh.normals = nor;
+                        mesh.uv = uv;
+                        mesh.bindposes = bones.Select(b => b.worldToLocalMatrix * modelGO.transform.localToWorldMatrix).ToArray();
+                        mesh.boneWeights = bw;
+
+                        for (int s = 0; s < mdl.Model.nummeshes; s++)
+                            mesh.SetTriangles(mdl.IndicesPerLod[lod][s], s);
+
+                        mesh.ClearBlendShapes();
+
+                        if (willBeSkinned && MDL_FlexDescs != null && MDL_FlexDescs.Length > 0)
+                        {
+                            int vFirst = mdl.VerticesGlobalStart;
+                            bool gotBlend = AddBlendshapesFromFlex(mesh, mdl.VerticesPerLod[lod], vFirst);
+
+                            if (gotBlend && baseBlendshapeMesh == null)
+                            {
+                                BuildAdvancedBlendshapes(mesh);
+                                baseBlendshapeMesh = mesh;
+                            }
+                            else if (baseBlendshapeMesh != null && lod > startLOD && mdl.LODRemap != null && mdl.LODRemap.Length > 0)
+                            {
+                                CloneFlexToLOD(baseBlendshapeMesh, mesh, mdl.LODRemap);
+                            }
+                        }
+
+                        var go = new GameObject($"{meshName}_GO");
+                        go.transform.SetParent(modelGO.transform, false);
+
+                        Renderer renderer;
+                        if (!MDL_Header.flags.HasFlag(StudioHDRFlags.STUDIOHDR_FLAGS_STATIC_PROP))
+                        {
+                            //Bind poses & bone weights
+                            SkinnedMeshRenderer SkinnedRenderer = go.AddComponent<SkinnedMeshRenderer>();
+                            renderer = SkinnedRenderer;
+                            Matrix4x4[] BindPoses = new Matrix4x4[bones.Length];
+
+                            for (Int32 i = 0; i < BindPoses.Length; i++)
+                                BindPoses[i] = bones[i].worldToLocalMatrix * go.transform.localToWorldMatrix;
+
+                            mesh.boneWeights = bw;
+                           mesh.bindposes = BindPoses;
+
+                            SkinnedRenderer.sharedMesh = mesh;
+                            SkinnedRenderer.rootBone = bones[0];
+                            SkinnedRenderer.bones = bones;
+                            SkinnedRenderer.updateWhenOffscreen = true;
+                        }
+                        //MeshRenderer (models with "STUDIOHDR_FLAGS_STATIC_PROP" flag or with generic "static_prop" bone)
+                        else
+                        {
+                            MeshFilter MeshFilter = go.AddComponent<MeshFilter>();
+                            renderer = go.AddComponent<MeshRenderer>();
+                            MeshFilter.sharedMesh = mesh;
+                        }
+                        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
+
+                        var mats = new Material[mesh.subMeshCount];
+                        for (int s = 0; s < mdl.Model.nummeshes; s++)
+                            mats[s] = FindMaterialForMesh(s, mdl);
+                        renderer.sharedMaterials = mats;
+
+                        if (lodEnable)
+                        {
+                            float h = mdl.LODData[lod].switchPoint >= 0
+                                      ? mdl.LODData[lod].switchPoint / maxSwitch
+                                      : Mathf.Clamp01(1f - lod * 0.1f);
+                            lodEntries.Add((h, renderer));
+                        }
+                    }
+
+                    if (lodEnable && lodEntries.Count > 0)
+                    {
+                        lodEntries.Sort((a, b) => b.height.CompareTo(a.height));
+                        const float eps = 0.0001f;
+                        for (int i = 1; i < lodEntries.Count; i++)
+                            if (lodEntries[i].height >= lodEntries[i - 1].height)
+                                lodEntries[i] = (lodEntries[i - 1].height - eps, lodEntries[i].renderer);
+
+                        var lodGO = new GameObject($"{mdl.Model.Name}_LODGroup");
+                        lodGO.transform.SetParent(modelGO.transform, false);
+                        var group = lodGO.AddComponent<LODGroup>();
+                        UnityEngine.LOD[] unityLods = lodEntries
+                            .Select(e => new UnityEngine.LOD(Mathf.Clamp01(e.height), new[] { e.renderer }))
+                            .ToArray();
+
+                        group.SetLODs(unityLods);
+                        group.RecalculateBounds();
+                    }
+                }
+            }
+
+            SetupAnimatorAndClips(modelGO, bones);
+
+            if (MDL_Header.flags.HasFlag(StudioHDRFlags.STUDIOHDR_FLAGS_STATIC_PROP))
+                modelGO.transform.eulerAngles = new Vector3(0, 90, 0);
+
+            return modelGO.transform;
+        }
+
+        private static bool IsFinite(Vector3 v) =>
+            !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) ||
+              float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));
+    }
+
+    public enum DetailMode
+    {
+        None, // Parse all lod's
+        Lowest,
+        Low,
+        Medium,
+        High
+    }
+}

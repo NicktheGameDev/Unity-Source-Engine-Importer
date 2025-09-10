@@ -52,8 +52,8 @@ namespace uSource.Decals
 
         private static Matrix4x4 GetLocalToWorldMatrix(Terrain terrain)
         {
-            var width = terrain.terrainData.heightmapWidth - 1;
-            var height = terrain.terrainData.heightmapHeight - 1;
+            var width = terrain.terrainData.heightmapResolution - 1;
+            var height = terrain.terrainData.heightmapResolution - 1;
             var scale = new Vector3(terrain.terrainData.size.x / width, 1, terrain.terrainData.size.z / height);
             return Matrix4x4.TRS(terrain.transform.position, Quaternion.identity, scale);
         }
@@ -76,8 +76,8 @@ namespace uSource.Decals
             max = Vector3Int.CeilToInt(bounds.max);
             min.x = Mathf.Max(min.x, 0);
             min.z = Mathf.Max(min.z, 0);
-            max.x = Mathf.Min(max.x, terrain.heightmapWidth - 1);
-            max.z = Mathf.Min(max.z, terrain.heightmapHeight - 1);
+            max.x = Mathf.Min(max.x, terrain.heightmapResolution - 1);
+            max.z = Mathf.Min(max.z, terrain.heightmapResolution - 1);
         }
     }
 }

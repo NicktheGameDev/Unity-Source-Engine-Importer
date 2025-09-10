@@ -11,6 +11,7 @@ namespace uSource.Formats.Source.MDL
     {
         public vertexFileHeader_t VVD_Header;
         public mstudiovertex_t[][] VVD_Vertexes;
+        internal readonly System.Collections.Generic.List<uSource.Formats.Source.MDL.VertexAnim> VertexAnims = new System.Collections.Generic.List<uSource.Formats.Source.MDL.VertexAnim>();
         public vertexFileFixup_t[] VVD_Fixups;
         //TODO
         //public Boolean HasTangents;

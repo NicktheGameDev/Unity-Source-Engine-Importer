@@ -1,0 +1,68 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using UnityEngine;
+
+namespace uSource
+{
+    public class BSPFileReader_
+    {
+        private const int ENTITY_LUMP_INDEX = 0; // Typically, entities are in lump index 0 in the BSP format
+        private static readonly string BSP_DIRECTORY_PATH = @"D:\STEAM\steamapps\common\Black Mesa\bms\maps\";
+
+        // Parses and returns the entity data as a single string from the BSP file
+        public static string GetEntityData(string bspFileName)
+        {
+            // Add .bsp extension if missing
+            if (!bspFileName.EndsWith(".bsp", StringComparison.OrdinalIgnoreCase))
+            {
+                bspFileName += ".bsp";
+            }
+
+            // Ensure the file path is from the specific BSP directory
+            string bspFilePath = Path.Combine(BSP_DIRECTORY_PATH, bspFileName);
+            Debug.Log($"Looking for BSP file at path: {bspFilePath}");
+
+            if (!File.Exists(bspFilePath))
+            {
+                Debug.LogError($"BSP file not found at path: {bspFilePath}");
+                return null;
+            }
+
+            using (FileStream fs = new FileStream(bspFilePath, FileMode.Open, FileAccess.Read))
+            using (uReader reader = new uReader(fs))
+            {
+                // Read BSP header and lump table
+                if (!ReadEntityLumpHeader(reader, out int entityLumpOffset, out int entityLumpLength))
+                {
+                    Debug.LogError("Failed to find the entity lump in BSP file.");
+                    return null;
+                }
+
+                // Read entity lump as a UTF-8 string
+                fs.Seek(entityLumpOffset, SeekOrigin.Begin);
+                byte[] entityBytes = reader.GetBytes(entityLumpLength, entityLumpOffset);
+                return Encoding.UTF8.GetString(entityBytes);
+            }
+        }
+
+
+        private static bool ReadEntityLumpHeader(uReader reader, out int offset, out int length)
+        {
+            // Move to start of BSP header
+            reader.BaseStream.Seek(4, SeekOrigin.Begin); // Skip the BSP version (4 bytes)
+
+            // Read lump offsets and sizes from BSP header (using standard 17-lump Source BSP format)
+            offset = length = 0;
+            for (int i = 0; i <= ENTITY_LUMP_INDEX; i++)
+            {
+                offset = reader.ReadInt32(); // Offset of the lump
+                length = reader.ReadInt32(); // Length of the lump
+                reader.BaseStream.Seek(8, SeekOrigin.Current); // Skip lump version & lump fourCC
+            }
+
+            return offset > 0 && length > 0;
+        }
+    }
+}

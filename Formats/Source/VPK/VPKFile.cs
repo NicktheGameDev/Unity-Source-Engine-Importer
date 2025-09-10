@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
+using UnityEngine;
+using System.Linq;
+using UnityEngine.Networking;
 
 namespace uSource.Formats.Source.VPK
 {
@@ -35,7 +38,7 @@ namespace uSource.Formats.Source.VPK
 		private VPKReaderBase Reader { get; set; }
 		private Boolean Disposed { get; set; } // To detect redundant calls
 
-		public Dictionary<String, VPKEntry> Entries = new Dictionary<String, VPKEntry>();
+		public  Dictionary<String, VPKEntry> Entries = new Dictionary<String, VPKEntry>();
 		internal Dictionary<Int32, VPKFilePart> Parts { get; } = new Dictionary<Int32, VPKFilePart>();
 		internal VPKFilePart MainPart
 		{
@@ -63,6 +66,32 @@ namespace uSource.Formats.Source.VPK
 		public void Load(String FileName)
 		{
 			Load(new FileStream(FileName, FileMode.Open, FileAccess.Read), FileName);
+		}
+		/// <summary>
+		/// Zwraca zawartość pliku z archiwum w postaci tablicy bajtów.
+		/// Rzuca wyjątkiem, jeśli pliku nie ma lub nie uda się go w całości odczytać.
+		/// </summary>
+		public byte[] GetFileBytes(string pathInVpk)
+		{
+			if (!Entries.TryGetValue(pathInVpk, out VPKEntry entry))
+				throw new FileNotFoundException($"Entry '{pathInVpk}' not found in VPK.");
+
+			return ReadFileData(entry);
+		}
+
+		/// <summary>
+		/// Bezpieczny wariant – zwraca true/false zamiast wyjątku.
+		/// </summary>
+		public bool TryGetFileBytes(string pathInVpk, out byte[] data)
+		{
+			if (!Entries.TryGetValue(pathInVpk, out VPKEntry entry))
+			{
+				data = null;
+				return false;
+			}
+
+			data = ReadFileData(entry);
+			return data != null && data.Length > 0;
 		}
 
 		/// <summary>
@@ -123,7 +152,66 @@ namespace uSource.Formats.Source.VPK
 			Loaded = true;
 		}
 
-		private void AddMainPart(String filename, Stream stream = null)
+		internal AudioClip LoadAudioClip(string soundPath)
+		{
+			if (!TryGetFileBytes(soundPath, out var data))
+			{
+				Debug.LogError($"Sound '{soundPath}' not found in VPK.");
+				return null;
+			}
+			return CreateAudioClipFromData(soundPath, data);
+		}
+
+       private static  List<VPKFilePart> Parts_ = new();
+       private byte[] ReadFileData(VPKEntry entry)
+       {
+	       if (!Parts.TryGetValue(entry.ArchiveIndex, out VPKFilePart part))
+		       throw new KeyNotFoundException(
+			       $"Part with index {entry.ArchiveIndex} not found (file {entry}).");
+
+	       Stream partStream = part.PartStream;
+	       partStream.Seek(entry.EntryOffset, SeekOrigin.Begin);
+
+	       byte[] buffer = new byte[entry.Length];
+	       int read = partStream.Read(buffer, 0, (int)entry.Length);
+	       if (read != entry.Length)
+		       throw new IOException(
+			       $"Short read for entry '{entry}' – expected {entry.Length}, got {read} bytes.");
+
+	       return buffer;
+       }
+
+        private static AudioClip CreateAudioClipFromData(string soundPath, byte[] fileData)
+        {
+            try
+            {
+                string tempPath = Path.Combine(Application.temporaryCachePath, Path.GetFileName(soundPath));
+                File.WriteAllBytes(tempPath, fileData);
+
+                using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{tempPath}", AudioType.UNKNOWN))
+                {
+                    var asyncOperation = www.SendWebRequest();
+                    while (!asyncOperation.isDone) { }
+
+                    if (www.result != UnityWebRequest.Result.Success)
+                    {
+                        Debug.LogError($"Failed to load audio clip from '{tempPath}': {www.error}");
+                        return null;
+                    }
+
+                    AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
+                    Debug.Log($"Audio clip loaded successfully: {soundPath}");
+                    return clip;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error creating AudioClip for '{soundPath}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private void AddMainPart(String filename, Stream stream = null)
 		{
 			if (stream == null)
 			{
@@ -168,6 +256,8 @@ namespace uSource.Formats.Source.VPK
 			Dispose(true);
 			GC.Collect();
 		}
-		#endregion
-	}
+
+
+        #endregion
+    }
 }

@@ -1,0 +1,4665 @@
+﻿#if STUDIO_H
+#define STUDIO_H
+#if _WIN32
+#endif
+#pragma once
+#endif
+#region "basetypes.h"
+#region "mathlib/vector2d.h"
+#region "mathlib/vector.h"
+#region "mathlib/vector4d.h"
+#region "mathlib/compressed_vector.h"
+#region "tier0/dbg.h"
+#region "tier0/threadtools.h"
+#region "mathlib/mathlib.h"
+#region "utlvector.h"
+#region "utlhash.h"
+#region "localflexcontroller.h"
+#region "utlsymbol.h"
+#define STUDIO_ENABLE_PERF_COUNTERS
+#define STUDIO_SEQUENCE_ACTIVITY_LOOKUPS_ARE_SLOW
+#define STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+#define STUDIO_VERSION
+#if _XBOX
+#define MAXSTUDIOTRIANGLES // TODO: tune this
+#define MAXSTUDIOVERTS // TODO: tune this
+#define MAXSTUDIOFLEXVERTS // max number of verts that can be flexed per mesh.  TODO: tune this
+#else
+#define MAXSTUDIOTRIANGLES
+#define MAXSTUDIOVERTS
+#define MAXSTUDIOFLEXVERTS
+#endif
+#define MAXSTUDIOSKINS // total textures
+#define MAXSTUDIOBONES // total bones actually used
+#define MAXSTUDIOFLEXDESC // maximum number of low level flexes (actual morph targets)
+#define MAXSTUDIOFLEXCTRL // maximum number of flexcontrollers (input sliders)
+#define MAXSTUDIOPOSEPARAM
+#define MAXSTUDIOBONECTRLS
+#define MAXSTUDIOANIMBLOCKS
+#define MAXSTUDIOBONEBITS
+#define MODEL_VERTEX_FILE_ID
+#define MODEL_VERTEX_FILE_VERSION
+#define MODEL_VERTEX_FILE_THIN_ID
+#define MAX_NUM_BONES_PER_VERT
+#define NEW_EVENT_STYLE
+#region "studio.h"
+#region "datacache/idatacache.h"
+#region "datacache/imdlcache.h"
+#region "convar.h"
+#region"tier0/memdbgon.h"
+using JetBrains.Annotations;
+using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Diagnostics.SymbolStore;
+using System.IO;
+using System.Linq;
+using System.Net.Mail;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using UnityEditor;
+using UnityEngine;
+using uSource.MathLib;
+using UnityEngine.UIElements;
+using uSource.Formats.Source.MDL;
+using static AllocationExample.SequenceMapping;
+using static ExecuteNTimes;
+using static ExecuteNTimes.iAnim;
+using static uSource.Formats.Source.MDL.StudioStruct;
+using static uSource.Formats.Source.MDL.StudioStruct.CStudioHdr;
+using static virtualgroup_t;
+using CStudioHdr = uSource.Formats.Source.MDL.CStudioHdr;
+using mstudioflexcontroller_t = ExecuteNTimes.iAnim.mstudioflexcontroller_t;
+class IMaterial { }
+class IMesh { }
+class IMorph { }
+public unsafe class virtualgroup_t
+{
+    void* cache;
+    public Int32[] masterNode;
+    public Int32[] masterPose;
+    public object[] masterBone { get; internal set; }
+    public Int32 boneMap { get; internal set; }
+    public object[] masterAnim { get; internal set; }
+    public object[] masterSeq { get; internal set; }
+    public virtualgroup_t()
+    {
+        cache = null;
+        studiohdr_t GetStudioHdr()
+        {
+            CUtlVector<Int32> boneMap;                // maps global bone to local bone
+            CUtlVector<Int32> masterBone;         // maps local bone to global bone
+            CUtlVector<Int32> masterSeq;          // maps local sequence to master sequence
+            CUtlVector<Int32> masterAnim;         // maps local animation to master animation
+            CUtlVector<Int32> masterAttachment;   // maps local attachment to global
+            CUtlVector<Int32> masterPose;         // maps local pose parameter to global
+            CUtlVector<Int32> masterNode;
+            return GetStudioHdr();
+        }
+    }
+    public struct virtualsequence_t
+    {
+#if _XBOX
+short flags;
+short activity;
+short group;
+short index;
+#else
+        public Int32 flags_;
+        public Int32 activity;
+        public Int32 group;
+        public Int32 index;
+#endif
+    };
+    public struct virtualgeneric_t
+    {
+#if XBOX
+short group;
+short index;
+#else
+        public Int32 group;
+        public Int32 index;
+#endif
+    };
+    public unsafe struct virtualmodel_t
+    {
+        void AppendSequences(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendAnimations(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendAttachments(Int32 ground, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendPoseParameters(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendBonemap(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendNodes(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendTransitions(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendIKLocks(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void AppendModels(Int32 group, studiohdr_t pStudioHdr)
+        {
+        }
+        void UpdateAutoplaySequences(studiohdr_t pStudioHdr)
+        {
+        }
+        private Int32 nextoffset;
+        public virtualgroup_t pAnimGroup(Int32 animation) { return m_group[m_anim[animation].group]; } // Note: user must manage mutex for this
+        public virtualgroup_t pSeqGroup(Int32 sequence)
+        {
+            if (sequence == m_seq.Count)
+            {
+                Debug.AssertFormat(true, "0");
+                return pSeqGroup(sequence);
+            }
+            return m_group[m_seq[sequence].group];
+        } // Note: user must manage mutex for this
+        public CThreadFastMutex m_Lock;
+        public CUtlVector<virtualsequence_t> m_seq;
+        public CUtlVector<virtualgeneric_t> m_anim;
+        public CUtlVector<virtualgeneric_t> m_attachment;
+        public CUtlVector<virtualgeneric_t> m_pose;
+        public CUtlVector<virtualgroup_t> m_group;
+        public CUtlVector<virtualgeneric_t> m_node;
+        public CUtlVector<virtualgeneric_t> m_iklock;
+        public CUtlVector<short> m_autoplaySequences;
+        public Int32 numlocalnodes { get; internal set; }
+    };
+    public struct vertexFileHeader_t_ { }
+    public struct thinModelVertices_t { }
+    internal studiohdr_t GetStudioHdr()
+    {
+        throw new NotImplementedException();
+    }
+
+    internal int Element(int iTo)
+    {
+        throw new NotImplementedException();
+    }
+}
+namespace uSource.Formats.Source.MDL
+{
+    [Flags]
+    public enum StudioHDRFlags
+    {
+        STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX = 0x00000001,
+        STUDIOHDR_FLAGS_USES_ENV_CUBEMAP = 0x00000002,
+        STUDIOHDR_FLAGS_FORCE_OPAQUE = 0x00000004,
+        STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS = 0x00000008,
+        STUDIOHDR_FLAGS_STATIC_PROP = 0x00000010,
+        STUDIOHDR_FLAGS_USES_FB_TEXTURE = 0x00000020,
+        STUDIOHDR_FLAGS_HASSHADOWLOD = 0x00000040,
+        STUDIOHDR_FLAGS_USES_BUMPMAPPING = 0x00000080,
+        STUDIOHDR_FLAGS_USE_SHADOWLOD_MATERIALS = 0x00000100,
+        STUDIOHDR_FLAGS_OBSOLETE = 0x00000200,
+        STUDIOHDR_FLAGS_UNUSED = 0x00000400,
+        STUDIOHDR_FLAGS_NO_FORCED_FADE = 0x00000800,
+        STUDIOHDR_FLAGS_FORCE_PHONEME_CROSSFADE = 0x00001000,
+        STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT = 0x00002000,
+        STUDIOHDR_FLAGS_FLEXES_CONVERTED = 0x00004000,
+        STUDIOHDR_FLAGS_BUILT_IN_PREVIEW_MODE = 0x00008000,
+        STUDIOHDR_FLAGS_AMBIENT_BOOST = 0x00010000,
+        STUDIOHDR_FLAGS_DO_NOT_CAST_SHADOWS = 0x00020000,
+        STUDIOHDR_FLAGS_CAST_TEXTURE_SHADOWS = 0x00040000,
+        STUDIOHDR_FLAGS_VERT_ANIM_FIXED_POINT_SCALE = 0x00200000,
+    }
+    public class StudioStruct
+    {
+        public const byte VTXStripGroupTriListFlag = 0x01;
+        public const byte VTXStripGroupTriStripFlag = 0x02;
+        public const byte STUDIO_ANIM_RAWPOS = 0x01;
+        public const byte STUDIO_ANIM_RAWROT = 0x02;
+        public const byte STUDIO_ANIM_ANIMPOS = 0x04;
+        public const byte STUDIO_ANIM_ANIMROT = 0x08;
+        public const byte STUDIO_ANIM_DELTA = 0x10;
+        public const Int32 STUDIO_ANIM_RAWROT2 = 0x20;
+        public unsafe studiohdr_t m_pStudioHdr;
+        public Rigidbody rigidbody_;
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiobone_t
+        {
+            public Int32 sznameindex;
+            public Int32 parent;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6)]
+            public Int32[] bonecontroller;
+            public Vector3 pos;
+            public Quaternion quat;
+            public Vector3 rot;
+            public Vector3 posscale;
+            public Vector3 rotscale;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 12)]
+            public Single[] poseToBone;
+            public Quaternion qAlignment;
+            public Int32 flags;
+            public Int32 proctype;
+            public Int32 procindex;
+            public Int32 physicsbone;
+            public Int32 surfacepropidx;
+            public Int32 contents;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Int32[] unused;
+        }
+        [Serializable]
+        public struct AniInfo
+        {
+            public string name;
+            public mstudioanimdesc_t studioAnim;
+            public List<AnimationBone> AnimationBones;
+            public Keyframe[][] PosX;
+            public Keyframe[][] PosY;
+            public Keyframe[][] PosZ;
+            public Keyframe[][] RotX;
+            public Keyframe[][] RotY;
+            public Keyframe[][] RotZ;
+            public Keyframe[][] RotW;
+        }
+        [Serializable]
+        public class AnimationBone
+        {
+            public byte Bone;
+            public byte Flags;
+            public Int32 NumFrames;
+            public Quaternion pQuat48;
+            public Quaternion pQuat64;
+            public Vector3 pVec48;
+            public List<Vector3> FrameAngles;
+            public List<Vector3> FramePositions;
+            public AnimationBone(byte bone, byte flags, Int32 numFrames)
+            {
+                Bone = bone;
+                Flags = flags;
+                NumFrames = numFrames;
+                FramePositions = new List<Vector3>();
+                FrameAngles = new List<Vector3>();
+            }
+            public void ReadData(uReader br)
+            {
+                var delta = (Flags & STUDIO_ANIM_DELTA) > 0;
+                if ((Flags & STUDIO_ANIM_ANIMROT) > 0)
+                {
+                    var startPos = br.BaseStream.Position;
+                    var offsets = br.ReadShortArray(3);
+                    var endPos = br.BaseStream.Position;
+                    var rotFrames = new List<float[]>();
+                    for (var i = 0; i < NumFrames; i++) rotFrames.Add(new float[] { 0, 0, 0 });
+                    for (var i = 0; i < 3; i++)
+                    {
+                        if (offsets[i] == 0) continue;
+                        br.BaseStream.Position = startPos + offsets[i];
+                        var values = br.ReadAnimationFrameValues(NumFrames);
+                        for (var f = 0; f < values.Length; f++)
+                        {
+                            rotFrames[f][i] = +values[f];
+                            if (f > 0 && delta) rotFrames[f][i] += values[f - 1];
+                        }
+                    }
+                    FrameAngles.AddRange(rotFrames.Select(x => new Vector3(x[0], x[1], x[2])));
+                    br.BaseStream.Position = endPos;
+                }
+                if ((Flags & STUDIO_ANIM_ANIMPOS) > 0)
+                {
+                    var startPos = br.BaseStream.Position;
+                    var offsets = br.ReadShortArray(3);
+                    var endPos = br.BaseStream.Position;
+                    var posFrames = new List<float[]>();
+                    for (var i = 0; i < NumFrames; i++) posFrames.Add(new float[] { 0, 0, 0 });
+                    for (var i = 0; i < 3; i++)
+                    {
+                        if (offsets[i] == 0) continue;
+                        br.BaseStream.Position = startPos + offsets[i];
+                        var values = br.ReadAnimationFrameValues(NumFrames);
+                        for (var f = 0; f < values.Length; f++)
+                        {
+                            posFrames[f][i] = +values[f];
+                            if (f > 0 && delta) posFrames[f][i] += values[f - 1];
+                        }
+                    }
+                    FramePositions.AddRange(posFrames.Select(x => new Vector3(x[0], x[1], x[2])));
+                    br.BaseStream.Position = endPos;
+                }
+                if ((Flags & STUDIO_ANIM_RAWROT) > 0)
+                {
+                    var quat48 = new Quaternion48();
+                    br.ReadTypeFixed(ref quat48, 6);
+                    this.pQuat48 = quat48.quaternion;
+                }
+                if ((Flags & STUDIO_ANIM_RAWROT2) > 0)
+                {
+                    var quat64 = new Quaternion64();
+                    br.ReadTypeFixed(ref quat64, 8);
+                    this.pQuat64 = quat64.quaternion;
+                }
+                if ((Flags & STUDIO_ANIM_RAWPOS) > 0)
+                {
+                    var vec48 = new Vector48();
+                    br.ReadTypeFixed(ref vec48, 6);
+                    this.pVec48 = vec48.ToVector3();
+                }
+            }
+        }
+        [Serializable]
+        public struct SeqInfo
+        {
+            public string name;
+            public mstudioseqdesc_t seq;
+            public AniInfo ani;
+        }
+        [Serializable]
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioanimdesc_t
+        {
+            public Int32 baseptr;
+            public Int32 sznameindex;
+            public Single fps;      // frames per second
+            public Int32 flags;     // looping/non-looping flags
+            public Int32 numframes;
+            public Int32 nummovements;
+            public Int32 movementindex;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6)]
+            public Int32[] unused1;         // remove as appropriate (and zero if loading older versions)
+            public Int32 animblock;
+            public Int32 animindex;  // non-zero when anim data isn't in sections
+            public Int32 numikrules;
+            public Int32 ikruleindex;   // non-zero when IK data is stored in the mdl
+            public Int32 animblockikruleindex; // non-zero when IK data is stored in animblock file
+            public Int32 numlocalhierarchy;
+            public Int32 localhierarchyindex;
+            public Int32 sectionindex;
+            public Int32 sectionframes; // number of frames used in each fast lookup section, zero if not used
+            public Int16 zeroframespan; // frames per span
+            public Int16 zeroframecount; // number of spans
+            public Int32 zeroframeindex;
+            public Single zeroframestalltime;       // saved during read stalls
+        };
+        [Serializable]
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioseqdesc_t
+        {
+            public Int32 baseptr;
+            public Int32 szlabelindex;
+            public Int32 szactivitynameindex;
+            public Int32 flags;     // looping/non-looping flags
+            public Int32 activity;  // initialized at loadtime to game DLL values
+            public Int32 actweight;
+            public Int32 numevents;
+            public Int32 eventindex;
+            public Vector3 bbmin;       // per sequence bounding box
+            public Vector3 bbmax;
+            public Int32 numblends;
+            public Int32 animindexindex;
+            public Int32 movementindex; // [blend] float array for blended movement
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Int32[] groupsize;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Int32[] paramindex;  // X, Y, Z, XR, YR, ZR
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Single[] paramstart; // local (0..1) starting value
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 2)]
+            public Single[] paramend;   // local (0..1) ending value
+            public Int32 paramparent;
+            public Single fadeintime;       // ideal cross fate in time (0.2 default)
+            public Single fadeouttime;  // ideal cross fade out time (0.2 default)
+            public Int32 localentrynode;        // transition node at entry
+            public Int32 localexitnode;     // transition node at exit
+            public Int32 nodeflags;     // transition rules
+            public Single entryphase;       // used to match entry gait
+            public Single exitphase;        // used to match exit gait
+            public Single lastframe;        // frame that should generation EndOfSequence
+            public Int32 nextseq;       // auto advancing sequences
+            public Int32 pose;          // index of delta animation between end and nextseq
+            public Int32 numikrules;
+            public Int32 numautolayers; //
+            public Int32 autolayerindex;
+            public Int32 weightlistindex;
+            public Int32 posekeyindex;
+            public Int32 numiklocks;
+            public Int32 iklockindex;
+            public Int32 keyvalueindex;
+            public Int32 keyvaluesize;
+            public Int32 cycleposeindex;        // index of pose parameter to use as cycle index
+            public Int32 activitymodifierindex;
+            public Int32 numactivitymodifiers;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 5)]
+            public Int32[] unused;      // remove/add as appropriate (grow back to 8 ints on version change!)
+        };
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiobbox_t
+        {
+            public Int32 bone;
+            public Int32 group;                 // intersection group
+            public Vector3 bbmin;              // bounding box
+            public Vector3 bbmax;
+            public Int32 szhitboxnameindex;  // offset to the name of the hitbox.
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Int32[] unused;
+        };
+        public struct Hitbox
+        {
+            public String Name;
+            public mstudiobbox_t BBox;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiohitboxset_t
+        {
+            public Int32 sznameindex;
+            public Int32 numhitboxes;
+            public Int32 hitboxindex;
+        };
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiotexture_t
+        {
+            public Int32 sznameindex;
+            public Int32 flags;
+            public Int32 used;
+            public Int32 unused1;
+            public Int32 material;
+            public Int32 clientmaterial;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 10)]
+            public Int32[] unused;
+        }
+        public struct StudioBodyPart
+        {
+            public String Name;
+            public StudioModel[] Models;
+        }
+        internal class ActivityToValueIdxHash { }
+        public struct mstudio_meshvertexdata_t
+        {
+            public Int32 modelvertexdata;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Int32[] numlodvertices;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct vertexFileHeader_t
+        {
+            public Int32 id;
+            public Int32 version;
+            public Int32 checksum;
+            public Int32 numLODs;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Int32[] numLODVertexes;
+            public Int32 numFixups;
+            public Int32 fixupTableStart;
+            public Int32 vertexDataStart;
+            public Int32 tangentDataStart;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiomodelgroup_t
+        {
+            public int labelIndex;
+            public int nameIndex;
+            private byte[] dataBuffer;
+            public mstudiomodelgroup_t(byte[] buffer)
+            {
+                dataBuffer = buffer;
+                labelIndex = 0; // Default value, can be set during instantiation
+                nameIndex = 0;  // Default value, can be set during instantiation
+            }
+            private string GetStringFromBuffer(int index)
+            {
+                if (index < 0 || index >= dataBuffer.Length)
+                    return string.Empty;
+                int length = 0;
+                while (index + length < dataBuffer.Length && dataBuffer[index + length] != 0)
+                    length++;
+                return System.Text.Encoding.ASCII.GetString(dataBuffer, index, length);
+            }
+            public string Label => GetStringFromBuffer(labelIndex);
+            public string Name => GetStringFromBuffer(nameIndex);
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiomodelgrouplookup_t
+        {
+            public Int32 modelGroup;
+            public Int32 indexWithinGroup;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct vertexFileFixup_t
+        {
+            public Int32 lod;
+            public Int32 sourceVertexID;
+            public Int32 numVertexes;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudiovertex_t
+        {
+            public mstudioboneweight_t m_BoneWeights;
+            public Vector3 m_vecPosition;
+            public Vector3 m_vecNormal;
+            public Vector2 m_vecTexCoord;
+            public static explicit operator mstudiovertex_t(Int32 v)
+            {
+                throw new NotImplementedException();
+            }
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct mstudioboneweight_t
+        {
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 3)]
+            public Single[] weight;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 3)]
+            public Byte[] bone;
+            public Byte numbones;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct FileHeader_t
+        {
+            public Int32 version;
+            public Int32 vertCacheSize;
+            public UInt16 maxBonesPerStrip;
+            public UInt16 maxBonesPerFace;
+            public Int32 maxBonesPerVert;
+            public Int32 checkSum;
+            public Int32 numLODs;
+            public Int32 materialReplacementListOffset;
+            public Int32 numBodyParts;
+            public Int32 bodyPartOffset;
+        }
+        public enum FlexControllerRemapType_t
+        {
+            FLEXCONTROLLER_REMAP_PASSTHRU = 0,
+            FLEXCONTROLLER_REMAP_2WAY,
+            FLEXCONTROLLER_REMAP_NWAY,
+            FLEXCONTROLLER_REMAP_EYELID
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct BodyPartHeader_t
+        {
+            public Int32 numModels;
+            public Int32 modelOffset;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct ModelHeader_t
+        {
+            public Int32 numLODs;
+            public Int32 lodOffset;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct ModelLODHeader_t
+        {
+            public Int32 numMeshes;
+            public Int32 meshOffset;
+            public Single switchPoint;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct MeshHeader_t
+        {
+            public Int32 numStripGroups;
+            public Int32 stripGroupHeaderOffset;
+            public Byte flags;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct StripGroupHeader_t
+        {
+            public Int32 numVerts;
+            public Int32 vertOffset;
+            public Int32 numIndices;
+            public Int32 indexOffset;
+            public Int32 numStrips;
+            public Int32 stripOffset;
+            public Byte flags;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct StripHeader_t
+        {
+            public Int32 numIndices;
+            public Int32 indexOffset;
+            public Int32 numVerts;
+            public Int32 vertOffset;
+            public Int16 numBones;
+            public Byte flags;
+            public Int32 numBoneStateChanges;
+            public Int32 boneStateChangeOffset;
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct Vertex_t
+        {
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 3)]
+            public Byte[] boneWeightIndices;
+            public Byte numBones;
+            public UInt16 origMeshVertId;
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 3)]
+            public Byte[] boneID;
+        }
+        public class CStudioHdr
+        {
+            private Int32 numflexcontrollers;
+            private Int32 flexcontrollerindex;
+            private VertexAnimationType vertAnimType; // Type of vertex animation (normal or wrinkle)
+            private MStudioVertAnim[] vertAnims; // Array of normal vertex animations
+            private MStudioVertAnimWrinkle[] vertAnimWrinkles; // Array of wrinkle vertex animations
+            private int vertIndex; // Index offset used for accessing animation data
+            private int numVerts;
+#pragma warning disable CS8500
+            public unsafe mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t l)
+#pragma warning restore CS8500
+            {
+                Int32 i = 0;
+#pragma warning disable CS8500
+                if (numflexcontrollers == 0 || (l >= 0 && i < numflexcontrollers))
+#pragma warning restore CS8500
+#pragma warning disable CS8500
+                    flexcontrollerindex = +i;
+                return pFlexcontroller(l);
+#pragma warning restore CS8500
+            }
+            public struct mstudioflexcontrollerui_t
+            {
+                public Int32 sznameindex;
+                public Int32 szindex0;
+                public Int32 szindex1;
+                public Int32 szindex2;
+                public FlexControllerRemapType_t remaptype;
+                public bool stereo;
+                public byte[] unused;
+                public string pszName(byte[] data)
+                {
+                    if (sznameindex >= data.Length)
+                        return string.Empty;  // Always check bounds
+                    return System.Text.Encoding.UTF8.GetString(data, sznameindex, data.Length - sznameindex);
+                }
+                public mstudioflexcontroller_t pController(byte[] data)
+                {
+                    return !stereo ? new mstudioflexcontroller_t() : new();
+                }
+                public string pszControllerName(byte[] data)
+                {
+                    return !stereo ? pController(data).pszName : null;
+                }
+                public Int32 controllerIndex(CStudioHdr cStudioHdr)
+                {
+                    return -1;
+                }
+                public mstudioflexcontroller_t pLeftController(byte[] data)
+                {
+                    return stereo ? new mstudioflexcontroller_t() : new();
+                }
+                public string pszLeftName(byte[] data)
+                {
+                    return stereo ? pLeftController(data).pszName : null;
+                }
+                public Int32 leftIndex(CStudioHdr cStudioHdr)
+                {
+                    return -1;
+                }
+                public mstudioflexcontroller_t pRightController(byte[] data)
+                {
+                    return stereo ? new mstudioflexcontroller_t() : new();
+                }
+                public string pszRightName(byte[] data)
+                {
+                    return stereo ? pRightController(data).pszName : null;
+                }
+                public Int32 rightIndex(CStudioHdr cStudioHdr)
+                {
+                    return -1;
+                }
+                public mstudioflexcontroller_t pNWayValueController(byte[] data)
+                {
+                    if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                    {
+                    }
+                    return pNWayValueController(data);
+                }
+                public unsafe string pszNWayValueName(byte[] data, CStudioHdr cStudioHdr)
+                {
+                    if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                    {
+                        pNWayValueController(data);
+                    }
+                    return pszNWayValueName(data, cStudioHdr);
+                }
+                public unsafe Int32 nWayValueIndex(CStudioHdr cStudioHdr, LocalFlexController_t l, byte[] data)
+                {
+                    if (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY)
+                    {
+                        pNWayValueController(data);
+                        return (Int32)cStudioHdr.pFlexcontroller(l);
+                    }
+                    return -1;
+                }
+                public Int32 Count()
+                {
+                    return (stereo ? 2 : 1) + (remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY ? 1 : 0);
+                }
+                public mstudioflexcontroller_t pController(byte[] data, Int32 index)
+                {
+                    switch (index)
+                    {
+                        case 0:
+                            return !stereo ? pController(data, szindex0) : new();
+                        case 1:
+                            return stereo ? pController(data, szindex1) : new();
+                        case 2:
+                            return remaptype == FlexControllerRemapType_t.FLEXCONTROLLER_REMAP_NWAY ? pController(data, szindex2) : new();
+                        default:
+                            return new();
+                    }
+                }
+            }
+            public struct StudioModel
+            {
+                public Boolean isBlank;
+                public mstudiomodel_t Model;
+                public Int32 NumLODs;
+                public ModelLODHeader_t[] LODData;
+                public mstudiomesh_t[] Meshes;
+                public Dictionary<Int32, List<Int32>>[] IndicesPerLod;
+                public mstudiovertex_t[][] VerticesPerLod;
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public struct mstudiobodyparts_t
+            {
+                public Int32 sznameindex;
+                public Int32 nummodels;
+                public Int32 _base;
+                public Int32 modelindex;
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public unsafe struct mstudiomodel_t
+            {
+                private fixed byte _name[64];
+                public string Name
+                {
+                    get
+                    {
+                        fixed (byte* name = _name)
+                        {
+                            return new string((sbyte*)name);
+                        }
+                    }
+                }
+                public Int32 type;
+                public Single boundingradius;
+                public Int32 nummeshes;
+                public Int32 meshindex;
+                public Int32 numvertices;
+                public Int32 vertexindex;
+                public Int32 tangentsindex;
+                public Int32 numattachments;
+                public Int32 attachmentindex;
+                public Int32 numeyeballs;
+                public Int32 eyeballindex;
+                public mstudioflexcontroller_t flexData;
+                public mstudio_modelvertexdata_t vertexdata;
+                private fixed Int32 _unused[8];
+                public override string ToString()
+                {
+                    return Name;
+                }
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public struct mstudio_modelvertexdata_t
+            {
+                public Int32 vertexdata;
+                public Int32 tangentdata;
+            }
+            public struct mstudioattachment_t
+            {
+                public Int32 sznameindex;
+                public UInt16 flags;
+                public Int32 localbone;
+                [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+                public Vector3[] local;
+                [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+                public Int32[] unused;
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public unsafe struct mstudiomesh_t
+            {
+                public Int32 material;
+                public Int32 modelindex;
+                public Int32 numvertices;
+                public Int32 vertexoffset;
+                public Int32 numflexes;
+                public Int32 flexindex;
+                public Int32 materialtype;
+                public Int32 materialparam;
+                public Int32 meshid;
+                public Vector3 center;
+                public mstudio_meshvertexdata_t VertexData;
+                public fixed Int32 _unused[8];
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public unsafe struct mstudiobonecontroller_t
+            {
+                public Int32 bone;
+                public Int32 type;
+                public float start;
+                public float end;
+                public Int32 rest;
+                public Int32 inputfield;
+                public fixed Int32 _unused[8];
+            }
+            public struct mstudioflexdesc_t
+            {
+                public Int32 flexdesc_count;
+            }
+            public struct mstudioflexcontroller_t
+            {
+                public Int32 sztypeindex;
+                public Int32 sznameindex;
+                public Int32 localToGlobal;
+                public float min;
+                public float max;
+                public string pszType { get; private set; }
+                public string pszName { get; private set; }
+                public void SetStrings(byte[] data, Int32 typeOffset, Int32 nameOffset)
+                {
+                    pszType = System.Text.Encoding.UTF8.GetString(data, typeOffset, data.Length - typeOffset);
+                    pszName = System.Text.Encoding.UTF8.GetString(data, nameOffset, data.Length - nameOffset);
+                }
+                public static explicit operator Int32(mstudioflexcontroller_t v)
+                {
+                    throw new NotImplementedException();
+                }
+            }
+            unsafe public struct mstudioflex_t
+            {
+                public Int32 flexDesc;
+                public float target0;
+                public float target1;
+                public float target2;
+                public float target3;
+                public Int32 numVerts;
+                public Int32 vertIndex;
+                public Int32 flexPair;
+                public VertexAnimationType vertAnimType;
+                public fixed byte unusedChar[1];
+                public fixed Int32 unused[8];
+                public struct MStudioVertAnim
+                {
+                    public short index;
+                    public byte speed;
+                    public byte side;
+                    public short delta;
+                    public short ndelta;
+                    public short wrinkleDelta;
+                }
+                public struct MStudioVertAnimWrinkle
+                {
+                    public short index;
+                    public byte speed;
+                    public byte side;
+                    public short wrinkleDelta;
+                }
+                public enum VertexAnimationType
+                {
+                    STUDIO_VERT_ANIM_NORMAL = 0,
+                    STUDIO_VERT_ANIM_WRINKLE,
+                }
+                public int GetVertAnimSizeBytes()
+                {
+                    return vertAnimType == VertexAnimationType.STUDIO_VERT_ANIM_NORMAL
+                    ? sizeof(short) * 5 + sizeof(byte) * 2 // size of MStudioVertAnim
+                    : sizeof(short) * 2 + sizeof(byte) * 2; // size of MStudioVertAnimWrinkle
+                }
+            }
+            public int GetVertAnimSizeBytes()
+            {
+                return vertAnimType == VertexAnimationType.STUDIO_VERT_ANIM_NORMAL
+                ? sizeof(short) * 5 + sizeof(byte) * 2 // size of MStudioVertAnim
+                : sizeof(short) * 2 + sizeof(byte) * 2; // size of MStudioVertAnimWrinkle
+            }
+            public byte[] GetBaseVertAnim()
+            {
+                int vertAnimSize = GetVertAnimSizeBytes();
+                byte[] vertAnimData = new byte[vertAnimSize * numVerts];
+                for (int i = 0; i < numVerts; i++)
+                {
+                    byte[] data = SerializeVertAnim(i);
+                    Array.Copy(data, 0, vertAnimData, i * vertAnimSize, data.Length);
+                }
+                return vertAnimData;
+            }
+            public MStudioVertAnimWrinkle GetVertAnimWrinkle(int i)
+            {
+                vertAnimType = VertexAnimationType.STUDIO_VERT_ANIM_WRINKLE;
+                if (i < 0 || i >= vertAnimWrinkles.Length)
+                {
+                    throw new IndexOutOfRangeException("Invalid vertex wrinkle animation index.");
+                }
+                return vertAnimWrinkles[i];
+            }
+            public MStudioVertAnim GetVertAnim(int i)
+            {
+                vertAnimType = VertexAnimationType.STUDIO_VERT_ANIM_NORMAL;
+                if (i < 0 || i >= vertAnims.Length)
+                {
+                    throw new IndexOutOfRangeException("Invalid vertex animation index.");
+                }
+                return vertAnims[i];
+            }
+            private byte[] SerializeVertAnim(int i)
+            {
+                if (vertAnimType == VertexAnimationType.STUDIO_VERT_ANIM_NORMAL)
+                {
+                    var vertAnim = GetVertAnim(i);
+                    return new byte[]
+                    {
+BitConverter.GetBytes(vertAnim.index)[0],
+BitConverter.GetBytes(vertAnim.index)[1],
+vertAnim.speed,
+vertAnim.side,
+BitConverter.GetBytes(vertAnim.delta)[0],
+BitConverter.GetBytes(vertAnim.delta)[1],
+BitConverter.GetBytes(vertAnim.ndelta)[0],
+BitConverter.GetBytes(vertAnim.ndelta)[1],
+BitConverter.GetBytes(vertAnim.wrinkleDelta)[0],
+BitConverter.GetBytes(vertAnim.wrinkleDelta)[1]
+                    };
+                }
+                else
+                {
+                    var vertAnimWrinkle = GetVertAnimWrinkle(i);
+                    return new byte[]
+                    {
+BitConverter.GetBytes(vertAnimWrinkle.index)[0],
+BitConverter.GetBytes(vertAnimWrinkle.index)[1],
+vertAnimWrinkle.speed,
+vertAnimWrinkle.side,
+BitConverter.GetBytes(vertAnimWrinkle.wrinkleDelta)[0],
+BitConverter.GetBytes(vertAnimWrinkle.wrinkleDelta)[1]
+                    };
+                }
+            }
+            public struct MStudioVertAnim
+            {
+                public short index;
+                public byte speed;
+                public byte side;
+                public short delta;
+                public short ndelta;
+                public short wrinkleDelta;
+            }
+            public struct MStudioVertAnimWrinkle
+            {
+                public short index;
+                public byte speed;
+                public byte side;
+                public short wrinkleDelta;
+            }
+            public enum VertexAnimationType
+            {
+                STUDIO_VERT_ANIM_NORMAL = 0,
+                STUDIO_VERT_ANIM_WRINKLE,
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public struct mstudioboneflexdriver_t
+            {
+                public Int32 boneIndex;
+                public Int32 controlCount;
+                public Int32 controlIndex;
+                public mstudioboneflexdrivercontrol_t[] GetBoneFlexDriverControls()
+                {
+                    mstudioboneflexdrivercontrol_t[] controls = new mstudioboneflexdrivercontrol_t[controlCount];
+                    unsafe
+                    {
+                        for (Int32 i = 0; i < controlCount; i++)
+                        {
+                            mstudioboneflexdrivercontrol_t* controlPtr = (mstudioboneflexdrivercontrol_t*)((byte*)+controlIndex + i * sizeof(mstudioboneflexdrivercontrol_t));
+                            controls[i] = *controlPtr;
+                        }
+                    }
+                    return controls;
+                }
+            }
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            public struct mstudioboneflexdrivercontrol_t
+            {
+                public Int32 boneComponent;
+                public Int32 flexControllerIndex;
+                public float min;
+                public float max;
+            }
+            public struct mstudiovertanim_t
+            {
+                public short index;
+                public byte speed;
+                public byte side;
+                [StructLayout(LayoutKind.Explicit)]
+                public struct DeltaUnion
+                {
+                    [FieldOffset(0)]
+                    public short delta;
+                    [FieldOffset(0)]
+                    public float flDelta;
+                    [FieldOffset(0)]
+                    public float flNDelta;
+                    [FieldOffset(0)]
+                    public short ndelta;
+                    const float flVertAnimFixedPointScale = 1.0f;
+                    public void ConvertToFixed()
+                    {
+                        flDelta = 0.0f;
+                        delta = (short)(flDelta / flVertAnimFixedPointScale);
+                        ndelta = (short)(flNDelta / flVertAnimFixedPointScale);
+                    }
+                    public Vector3 GetDeltaFixed(Vector3Int flVertAnimFixedPointScale)
+                    {
+                        flDelta = 0.0f;
+                        return Vector3.Scale(new Vector3(delta = 0, delta = 1, delta = 2), flVertAnimFixedPointScale);
+                    }
+                    public Vector3 GetNDeltaFixed(Vector3Int flVertAnimFixedPointScale)
+                    {
+                        flNDelta = 0.0f;
+                        return Vector3.Scale(new Vector3(ndelta = 0, ndelta = 1, ndelta = 2), flVertAnimFixedPointScale);
+                    }
+                    public unsafe void GetDeltaFixed4DAlingned(Vector4* vFillin, float flVertAnimFixedPointScale)
+                    {
+                        flDelta = 0.0f;
+                        vFillin->Set(delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale, 0.0f);
+                    }
+                    public unsafe void GetNDeltaFixed4DAlingned(Vector4* vFillin, float flVertAnimFixedPointScale)
+                    {
+                        flDelta = 0.0f;
+                        vFillin->Set(delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale, delta * flVertAnimFixedPointScale, 0.0f);
+                    }
+                    public Vector3 GetDeltaFloat()
+                    {
+                        flDelta = 0.0f;
+                        return new Vector3(flDelta = 0, flDelta = 1, flDelta = 2);
+                    }
+                    public Vector3 GetNDeltaFloat()
+                    {
+                        flNDelta = 0.0f;
+                        return new Vector3(flNDelta = 0, flNDelta = 1, flNDelta = 2);
+                    }
+                    public void SetNDeltaFixed(Vector3 vInput, float flVertAnimFixedPointScale)
+                    {
+                        ndelta = (short)(vInput.x / flVertAnimFixedPointScale);
+                        ndelta = (short)(vInput.y / flVertAnimFixedPointScale);
+                        ndelta = (short)(vInput.z / flVertAnimFixedPointScale);
+                    }
+                    public void SetDeltaFixed(Vector3 vInput, float flVertAnimFixedPointScale)
+                    {
+                        delta = (short)(vInput.x / flVertAnimFixedPointScale);
+                        delta = (short)(vInput.y / flVertAnimFixedPointScale);
+                        delta = (short)(vInput.z / flVertAnimFixedPointScale);
+                    }
+                    public void SetDeltaFloat(Vector3 vInputNormal)
+                    {
+                        flDelta = vInputNormal.x;
+                        flDelta = vInputNormal.y;
+                        flDelta = vInputNormal.z;
+                    }
+                    public void SetNDeltaFloat(Vector3 vInputNormal)
+                    {
+                        flNDelta = vInputNormal.x;
+                        flNDelta = vInputNormal.y;
+                        flNDelta = vInputNormal.z;
+                    }
+                    public struct mstudiovertanim_wrinkle_t
+                    {
+                        public short wrinkledelta;
+                        public void SetWrinkleFixed(float flWrinkle, float flVertAnimFixedPointScale)
+                        {
+                            Int32 nWrinkleDeltaInt = (Int32)(flWrinkle / flVertAnimFixedPointScale);
+                            DeltaUnion union = new DeltaUnion();
+                            wrinkledelta = (short)Mathf.Clamp(nWrinkleDeltaInt, -32767, 32767);
+                            Vector4 GetDeltaFixed(Vector4 flVertAnimFixedPointScale)
+                            {
+                                GetDeltaFixed(new Vector4());
+                                return Vector4.Scale(union.delta * flVertAnimFixedPointScale, union.delta * flVertAnimFixedPointScale * nWrinkleDeltaInt);
+                            }
+                            unsafe void GetDeltaFixed4DAligned(Vector4* vFillIn, float flVertAnimFixedPointScale)
+                            {
+                                vFillIn->Set(flVertAnimFixedPointScale, flVertAnimFixedPointScale, flVertAnimFixedPointScale, nWrinkleDeltaInt * flVertAnimFixedPointScale);
+                                GetDeltaFixed4DAligned(vFillIn, flVertAnimFixedPointScale);
+                            }
+                            float GetWrinkleDeltaFixed(float flVertAnimFixedPointScale)
+                            {
+                                return GetWrinkleDeltaFixed(nWrinkleDeltaInt * flVertAnimFixedPointScale);
+                            }
+                        }
+                    }
+                    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+                    public struct mstudioaimatbone_t
+                    {
+                        public Int32 parent;
+                        public Int32 aim;
+                        public Vector3 aimvector;
+                        public Vector3 upvector;
+                        public Vector3 basepos;
+                    }
+                    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+                    public unsafe struct mstudiolinearbone_t
+                    {
+                        public Int32 numbones;
+                        public Int32 flagsindex;
+                        public Int32 flags(Int32 i) => *((Int32*)((byte*)+flagsindex) + i);
+                    }
+                    public enum flexOptype
+                    {
+                        CONST = 1,
+                        FETCH1 = 2,
+                        FETCH2 = 3,
+                        ADD = 4,
+                        SUB = 5,
+                        MUL = 6,
+                        DIV = 7,
+                        NEG = 8,
+                        EXP = 9,
+                        OPEN = 10,
+                        CLOSE = 11,
+                        COMMA = 12,
+                        MAX = 13,
+                        MIN = 14,
+                        TWO_WAY_0 = 15,
+                        TWO_WAY_1 = 16,
+                        NWAY = 17,
+                        COMBO = 18,
+                        DOMINATE = 19,
+                        DME_LOWER_EYELID = 20,
+                        DME_UPPER_EYELID = 21,
+                    }
+                    public struct mstudioflexop_t
+                    {
+                        public flexOptype op;
+                        public float value;
+                        public static mstudioflexop_t FromBuffer(BinaryReader buffer, Int32 version)
+                        {
+                            mstudioflexop_t op = new mstudioflexop_t();
+                            op.value = version;
+                            op.op = (flexOptype)buffer.ReadUInt32();
+                            if (op.op == flexOptype.CONST)
+                                op.value = buffer.ReadSingle();
+                            else
+                                op.value = buffer.ReadInt32();
+                            return op;
+                        }
+                        public override string ToString()
+                        {
+                            return $"FlexOP({op}){(value)}";
+                        }
+                    }
+                    unsafe struct vertexFileHeader_t___
+                    {
+                        Int32 id;                             // MODEL_VERTEX_FILE_ID
+                        Int32 version;                        // MODEL_VERTEX_FILE_VERSION
+                        Int32 checksum;                       // same as studiohdr_t, ensures sync
+                        Int32 numLODs;                        // num of valid lods
+                        fixed Int32 numLODVertexes[3];   // num verts for desired root lod
+                        Int32 numFixups;                      // num of vertexFileFixup_t
+                        Int32 fixupTableStart;                // offset from base to fixup table
+                        Int32 vertexDataStart;                // offset from base to vertex block
+                        Int32 tangentDataStart;               // offset from base to tangent block
+                        public class VTXMesh
+                        {
+                            public List<Vertex_t> Points { get; private set; }
+                            public VTXMesh()
+                            {
+                                Points = new List<Vertex_t>();
+                            }
+                        }
+                        public class VTXPoint
+                        {
+                            public byte[] BoneWeightIndices { get; private set; }
+                            public Int32 NumBones { get; private set; }
+                            public short VertexIndex { get; private set; }
+                            public byte[] BoneIDs { get; private set; }
+                            public VTXPoint(byte[] boneWeightIndices, Int32 numBones, short vertexIndex, byte[] boneIDs)
+                            {
+                                BoneWeightIndices = boneWeightIndices;
+                                NumBones = numBones;
+                                VertexIndex = vertexIndex;
+                                BoneIDs = boneIDs;
+                            }
+                        }
+                    }
+                }
+            }
+            internal mstudioseqdesc_t pSeqdesc(Int32 i)
+            {
+                throw new NotImplementedException();
+            }
+            internal Int32 GetNumSeq()
+            {
+                throw new NotImplementedException();
+            }
+            internal bool SequencesAvailable()
+            {
+                throw new NotImplementedException();
+            }
+            internal object GetVirtualModel()
+            {
+                throw new NotImplementedException();
+            }
+            internal object GetRenderHdr()
+            {
+                throw new NotImplementedException();
+            }
+            internal object pszName()
+            {
+                throw new NotImplementedException();
+            }
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct studiohdr_t
+        {
+            public Int32 numlocalikautoplaylocks;
+            public Int32 id;
+            public Int32 version;
+            public Int32 checksum;
+            private fixed byte _name[64];
+            public Int32 numlocalposeparameters;
+            public Int32[] m_group;
+            public bool rtue;
+            public Int32 numlocalseq;
+            public class List<m_attachment>
+            {
+                public m_attachment m_Attachment;
+                internal Int32 Count()
+                {
+                    throw new NotImplementedException();
+                }
+            }
+            public string Name
+            {
+                get
+                {
+                    fixed (byte* name = _name)
+                    {
+                        return new string((sbyte*)name);
+                    }
+                }
+            }
+            public void pLocalIKAutoplayLock()
+            {
+            }
+            public Int32 eyeball_count;  // Number of eyeballs in the model
+            public Int32 eyeball_offset; // Offset to the eyeball data in the model
+            public Int32 jigglebone_count;  // Number of jiggle bones in the model
+            public Int32 jigglebone_offset; // Offset to the jiggle bone data in the model
+            public Int32 dataLength;
+            public Vector3 eyeposition;
+            public Vector3 illumposition;
+            public Vector3 hull_min;
+            public Vector3 hull_max;
+            public Vector3 view_bbmin;
+            public Vector3 view_bbmax;
+            public StudioHDRFlags flags;
+            public Int32 bone_count;
+            public Int32 bone_offset;
+            public Int32 bonecontroller_count;
+            public Int32 bonecontroller_offset;
+            public Int32 hitbox_count;
+            public Int32 hitbox_offset;
+            public Int32 localanim_count;
+            public Int32 localanim_offset;
+            public Int32 localseq_count;
+            public Int32 localseq_offset;
+            public Int32 activitylistversion;
+            public Int32 eventsindexed;
+            public Int32 texture_count;
+            public Int32 texture_offset;
+            public Int32 texturedir_count;
+            public Int32 texturedir_offset;
+            public Int32 skinreference_count;
+            public Int32 skinrfamily_count;
+            public Int32 skinreference_index;
+            public Int32 bodypart_count;
+            public Int32 bodypart_offset;
+            public Int32 attachment_count;
+            public Int32 attachment_offset;
+            public Int32 localnode_count;
+            public Int32 localnode_index;
+            public Int32 localnode_name_index;
+            public Int32 flexdesc_count;
+            public Int32 flexdesc_index;
+            public Int32 flexcontroller_count;
+            public Int32 flexcontroller_index;
+            public Int32 flexrules_count;
+            public Int32 flexrules_index;
+            public Int32 ikchain_count;
+            public Int32 ikchain_index;
+            public Int32 mouths_count;
+            public Int32 mouths_index;
+            public Int32 localposeparam_count;
+            public Int32 localposeparam_index;
+            public Int32 surfaceprop_index;
+            public Int32 keyvalue_index;
+            public Int32 keyvaluesize;
+            public Int32 iklock_count;
+            public Int32 iklock_index;
+            public Single mass;
+            public Int32 contents;
+            public Int32 includemodel_count;
+            public Int32 includemodel_index;
+            public Int32 virtualModel;
+            public Int32 animblocks_name_index;
+            public Int32 animblocks_count;
+            public Int32 animblocks_index;
+            public Int32 animblockModel;
+            public Int32 bonetablename_index;
+            public Int32 vertex_base;
+            public Int32 offset_base;
+            public Byte directionaldotproduct;
+            public Byte rootLod;
+            public Byte numAllowedRootLods;
+            public Byte unused;
+            public Int32 unused2;
+            public Int32 flexcontrollerui_count;
+            public Int32 flexcontrollerui_index;
+            public Int32 numlocalattachments;
+            public Int32 localattachmentindex;
+#pragma warning disable CS8500
+            public unsafe mstudioattachment_t pLocalAttachment(Int32 i)
+#pragma warning restore CS8500
+            {
+                if (i >= 0 && i < numlocalattachments)
+                {
+#pragma warning disable CS8500
+                    localattachmentindex = +i;
+                    return (pLocalAttachment(i));
+#pragma warning restore CS8500
+                }
+                return pLocalAttachment(i);
+            }
+            Int32 numlocalnodes;
+            Int32 localnodeindex;
+            Int32 localnodenameindex;
+            private static string[] localNodeNames; // Array of node names
+            public static int numLocalNodes; //
+            internal readonly Int32 numincludemodels;
+            public class NodeNameHandler
+            {
+                public NodeNameHandler(string[] nodeNames)
+                {
+                    localNodeNames = nodeNames;
+                    numLocalNodes = nodeNames.Length;
+                }
+            }
+            public byte pLocalTransition(Int32 i)
+            {
+                if (i >= 0 && i < (numlocalnodes * numlocalnodes))
+                {
+                    byte numLocalname = new byte();
+                    return (byte)(numLocalname + localnodeindex + i);
+                }
+                else
+                {
+                    return new byte();
+                }
+            }
+            public char pszLocalNodeName(int iNode)
+            {
+                if (iNode >= 0 && iNode < numLocalNodes)
+                {
+                    string nodeName = localNodeNames[iNode];
+                    return nodeName.Length > 0 ? nodeName[0] : '\0'; // Return first char of the node name, or null if empty
+                }
+                else
+                {
+                    return '\0'; // Return null character if index is out of range
+                }
+            }
+            internal object GetVirtualModel()
+            {
+                throw new NotImplementedException();
+            }
+            internal object pLocalSeqdesc(Int32 index)
+            {
+                throw new NotImplementedException();
+            }
+            internal object pLocalPoseParameter(Int32 index)
+            {
+                throw new NotImplementedException();
+            }
+            internal object pLocalIKAutoplayLock(Int32 index)
+            {
+                throw new NotImplementedException();
+            }
+            internal mstudioanimdesc_t pLocalAnimdesc(Int32 index)
+            {
+                throw new NotImplementedException();
+            }
+            internal string pszName()
+            {
+                throw new NotImplementedException();
+            }
+            internal byte* GetAnimBlock(Int32 block)
+            {
+                throw new NotImplementedException();
+            }
+        }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct mstudioposeparamdesc_t
+        {
+            public Int32 sznameindex;
+            public Int32 flags;
+            public float start;
+            public float end;
+            public float loop;
+            public string pszName(byte* buffer)
+            {
+                byte* namePtr = buffer + sznameindex;
+                Int32 len = 0;
+                while (*(namePtr + len) != 0)
+                {
+                    len++;
+                }
+                char[] nameChars = new char[len];
+                for (Int32 i = 0; i < len; i++)
+                {
+                    nameChars[i] = (char)*(namePtr + i);
+                }
+                return new string(nameChars);
+            }
+        }
+        enum jigglebones_T
+        {
+            JIGGLE_IS_FLEXIBLE = 0x01,
+            JIGGLE_IS_RIGID = 0x02,
+            JIGGLE_HAS_YAW_CONSTRAINT = 0x04,
+            JIGGLE_HAS_PITCH_CONSTRAINT = 0x08,
+            JIGGLE_HAS_ANGLE_CONSTRAINT = 0x10,
+            JIGGLE_HAS_LENGTH_CONSTRAINT = 0x20,
+            JIGGLE_HAS_BASE_SPRING = 0x40
+        }
+        struct mstudiojigglebone_t
+        {
+            Int32 flags;
+            float length;                   // how from from bone base, along bone, is tip
+            float tipMass;
+            float yawStiffness;
+            float yawDamping;
+            float pitchStiffness;
+            float pitchDamping;
+            float alongStiffness;
+            float alongDamping;
+            float angleLimit;               // maximum deflection of tip in radians
+            float minYaw;                   // in radians
+            float maxYaw;                   // in radians
+            float yawFriction;
+            float yawBounce;
+            float minPitch;             // in radians
+            float maxPitch;             // in radians
+            float pitchFriction;
+            float pitchBounce;
+            float baseMass;
+            float baseStiffness;
+            float baseDamping;
+            float baseMinLeft;
+            float baseMaxLeft;
+            float baseLeftFriction;
+            float baseMinUp;
+            float baseMaxUp;
+            float baseUpFriction;
+            float baseMinForward;
+            float baseMaxForward;
+            float baseForwardFriction;
+            float boingImpactSpeed;
+            float boingImpactAngle;
+            float boingDampingRate;
+            float boingFrequency;
+            float boingAmplitude;
+        };
+        public unsafe struct mstudioflexop_t
+        {
+            public Int32 op;
+            public Int32 d;
+        };
+        public unsafe struct mstudioflexrule_t
+        {
+            public Int32 flex;
+            public Int32 numops;
+            public Int32 opindex;
+            public mstudioflexop_t* iFlexOp(Int32 i) => (mstudioflexop_t*)((byte*)opindex + i);
+        };
+        public unsafe struct mstudioeyeball_t
+        {
+            public Int32 sznameindex;
+            public Int32 bone;
+            public Vector3 org;
+            public float zoffset;
+            public float radius;
+            public Vector3 up;
+            public Vector3 forward;
+            public Int32 texture;
+            public Int32 unused1;
+            public float iris_scale;
+            public Int32 unused2;
+            public fixed Int32 upperflexdesc[3];
+            public fixed Int32 lowerflexdesc[3];
+            public fixed float uppertarget[3];
+            public fixed float lowertarget[3];
+            public Int32 upperlidflexdesc;
+            public Int32 lowerlidflexdesc;
+            public fixed Int32 unused[4];
+            public bool m_bNonFACS;
+            public fixed Int32 unused3[3];
+            public fixed Int32 unused4[7];
+            public mstudioeyeball_t(Int32 sznameindex, Int32 bone, Vector3 org, float zoffset, float radius,
+            Vector3 up, Vector3 forward, Int32 texture, Int32 unused1, float iris_scale,
+            Int32 unused2, Int32 upperlidflexdesc, Int32 lowerlidflexdesc, bool m_bNonFACS)
+            {
+                fixed (Int32* unsed_ = unused)
+                fixed (Int32* unused3_ = unused3)
+                fixed (Int32* unused4_ = unused4)
+                fixed (Int32* upperflex = upperflexdesc)
+                fixed (float* lowertarget_ = lowertarget)
+                fixed (Int32* lowerflex = lowerflexdesc)
+                fixed (float* uppertarget_ = uppertarget)
+                    this.sznameindex = sznameindex;
+                this.bone = bone;
+                this.org = org;
+                this.zoffset = zoffset;
+                this.radius = radius;
+                this.up = up;
+                this.forward = forward;
+                this.texture = texture;
+                this.unused1 = unused1;
+                this.iris_scale = iris_scale;
+                this.unused2 = unused2;
+                this.upperlidflexdesc = upperlidflexdesc;
+                this.lowerlidflexdesc = lowerlidflexdesc;
+                this.m_bNonFACS = m_bNonFACS;
+            }
+            private mstudioeyeball_t(mstudioeyeball_t vOther)
+            {
+                fixed (Int32* unsed_ = unused)
+                fixed (Int32* unused3_ = unused3)
+                fixed (Int32* unused4_ = unused4)
+                fixed (Int32* upperflex = upperflexdesc)
+                fixed (float* lowertarget_ = lowertarget)
+                fixed (Int32* lowerflex = lowerflexdesc)
+                fixed (float* uppertarget_ = uppertarget)
+                    this.sznameindex = vOther.sznameindex;
+                this.bone = vOther.bone;
+                this.org = vOther.org;
+                this.zoffset = vOther.zoffset;
+                this.radius = vOther.radius;
+                this.up = vOther.up;
+                this.forward = vOther.forward;
+                this.texture = vOther.texture;
+                this.unused1 = vOther.unused1;
+                this.iris_scale = vOther.iris_scale;
+                this.unused2 = vOther.unused2;
+                this.upperlidflexdesc = vOther.upperlidflexdesc;
+                this.lowerlidflexdesc = vOther.lowerlidflexdesc;
+                this.m_bNonFACS = vOther.m_bNonFACS;
+            }
+        }
+        public struct mstudioiklink_t
+        {
+            public Int32 bone;
+            public Vector3 kneeDir;
+            public Vector3 unused0;
+        };
+        public unsafe struct mstudioikchain_t
+        {
+            public Int32 sznameindex;
+            public Int32 linktype;
+            public Int32 numlinks;
+            public Int32 linkindex;
+            public mstudioiklink_t* pLink(Int32 i) => (mstudioiklink_t*)((byte*)linkindex + i);
+        };
+        public struct mstudioiface_t
+        {
+            public ushort a, b, c;
+        };
+        Int32 EntryNode(Int32 iSequence)
+        {
+            return EntryNode(iSequence);
+        }
+        Int32 ExitNode(Int32 iSequence)
+        {
+            return ExitNode(iSequence);
+        }
+        unsafe char* pszNodeName(Int32 iNode)
+        {
+            return pszNodeName(iNode);
+        }
+        Int32 GetTransition(Int32 iFrom, Int32 iTo)
+        {
+            return GetTransition(iFrom, iTo);
+        }
+        Int32 numflexdesc;
+        Int32 flexdescindex;
+        unsafe mstudioflexdesc_t* pFlexdesc(Int32 i)
+        {
+            if (i >= 0 && i < numflexdesc)
+                return (mstudioflexdesc_t*)+flexdescindex + i;
+            return pFlexdesc(i);
+        }
+        Int32 numflexcontrollers;
+        Int32 flexcontrollerindex;
+        unsafe mstudioflexcontroller_t PFlexcontroller(LocalFlexController_t l, Int32 i)
+        {
+            if (numflexcontrollers == 0 || (l >= 0 && i < numflexcontrollers))
+                flexcontrollerindex = i;
+            return PFlexcontroller(l, i);
+        }
+        Int32 numflexrules;
+        Int32 flexruleindex;
+        unsafe mstudioflexrule_t* pFlexRule(Int32 i)
+        {
+            if (i >= 0 && i < numflexrules)
+                return (mstudioflexrule_t*)(((byte*)+flexruleindex) + i);
+            return pFlexRule(i);
+        }
+        Int32 numikchains;
+        Int32 ikchainindex;
+        unsafe mstudioikchain_t* pIKChain(Int32 i)
+        {
+            if (i >= 0 && i < numikchains)
+                return (mstudioikchain_t*)(((byte*)+ikchainindex) + i);
+            return pIKChain(i);
+        }
+        private struct mstudioanimblock_t
+        {
+            public Int32 datastart;
+            public Int32 dataend;
+        };
+        struct mstudiomouth_t
+        {
+            public Int32 bone;
+            public Vector3 forward;
+            public Int32 flexdesc;
+            public void mstudiomouth_t_(mstudiomouth_t vOther)
+            {
+                vOther.bone = bone;
+            }
+        }
+        Int32 nummouths;
+        Int32 mouthindex;
+        unsafe mstudiomouth_t* pMouth(Int32 i)
+        {
+            if (i >= 0 && i < nummouths)
+                return (mstudiomouth_t*)(((byte*)+mouthindex) + i);
+            return pMouth(i);
+        }
+        Int32 numlocalposeparameters;
+        Int32 localposeparamindex;
+        unsafe mstudioposeparamdesc_t* pLocalPoseParameter(Int32 i)
+        {
+            if (i >= 0 && i < numlocalposeparameters)
+                return (mstudioposeparamdesc_t*)(((byte*)+localposeparamindex) + i);
+            return pLocalPoseParameter(i);
+        }
+        public Int32 GetNumPoseParameters()
+        {
+            return 0;
+        }
+        mstudioposeparamdesc_t pPoseParameter(Int32 i)
+        {
+            return pPoseParameter(i);
+        }
+        Int32 GetSharedPoseParameter(Int32 iSequence, Int32 iLocalPose)
+        {
+            return GetSharedPoseParameter(iSequence, iLocalPose);
+        }
+        Int32 surfacepropindex;
+        public unsafe char* pszSurfaceProp()
+        {
+            return ((char*)+surfacepropindex);
+        }
+        Int32 keyvalueindex;
+        Int32 keyvaluesize;
+        public unsafe char* KeyValueText()
+        {
+            return keyvaluesize != 0 ? ((char*)+keyvalueindex) : null;
+        }
+        Int32 numlocalikautoplaylocks;
+        Int32 localikautoplaylockindex;
+        mstudioiklock_t mstudioiklock_T = new();
+        unsafe mstudioiklock_t pLocalIKAutoplayLock(Int32 i)
+        {
+            if (i >= 0 && i < numlocalikautoplaylocks)
+                return pLocalIKAutoplayLock(i);
+            return pLocalIKAutoplayLock(i);
+        }
+        unsafe mstudioiklock_t pIKAutoplayLock(Int32 i)
+        {
+            return pIKAutoplayLock(i);
+        }
+        unsafe public Int32 CountAutoplaySequences(short pOut, Int32 outCount)
+        {
+            CountAutoplaySequences(pOut, outCount);
+            return 1;
+        }
+        public unsafe Int32 CopyAutoplaySequences(short pOut, Int32 outCount)
+        {
+            CopyAutoplaySequences(pOut, outCount);
+            return 1;
+        }
+        public Int32 GetAutoplayList(short pOut)
+        {
+            return GetAutoplayList(pOut);
+        }
+        public float mass;
+        public Int32 contents;
+        Int32 numincludemodels;
+        Int32 includemodelindex;
+        unsafe mstudiomodelgroup_t pModelGroup(Int32 i)
+        {
+            if ((i >= 0 && i < numincludemodels))
+            {
+                return new mstudiomodelgroup_t();
+            }
+            return pModelGroup(i);
+        }
+        unsafe studiohdr_t FindModel(void** cache, char* modelname)
+        {
+            Int32 unused_virtualModel;
+            unsafe virtualmodel_t GetVirtualModel()
+            {
+                return GetVirtualModel();
+            }
+            Int32 unused_animblockModel;
+            Int32 animblockindex;
+            Int32 szanimblocknameindex;
+            unsafe char pszAnimBlockName()
+            {
+                return pszAnimBlockName();
+            }
+            Int32 numanimblocks;
+            unsafe mstudioanimblock_t* pAnimBlock(Int32 i)
+            {
+                if ((i > 0 && i < numanimblocks))
+                {
+                    return (mstudioanimblock_t*)(((byte*)+animblockindex) + i);
+                }
+                return pAnimBlock(i);
+            }
+            return FindModel(cache, modelname);
+            byte GetAnimBlock(Int32 i)
+            {
+                Int32 bonetablebynameindex;
+                Int32 unused_pVertexBase;
+                Int32 unused_pIndexBase;
+                byte constdirectionallightdot;
+                byte rootLOD;
+                byte numAllowedRootLODs;
+                byte unused;
+                Int32 unused4;
+                Int32 numflexcontrollerui;
+                Int32 flexcontrolleruiindex;
+#pragma warning disable CS8500
+                unsafe mstudioflexcontrollerui_t pFlexControllerUI(Int32 i)
+                {
+                    if ((i >= 0 && i < numflexcontrollerui))
+                    {
+                        flexcontrolleruiindex = +i;
+                    }
+                    return pFlexControllerUI(i);
+                }
+#pragma warning restore CS8500
+                float flVertAnimFixedPointScale;
+                StudioHDRFlags flags;
+                float VertAnimFixedPointScale() { return (flags == StudioHDRFlags.STUDIOHDR_FLAGS_BUILT_IN_PREVIEW_MODE) ? flVertAnimFixedPointScale : 1.0f / 4096.0f; }
+                studiohdr_t vOther;
+                return (byte)GetAnimBlock(i);
+            }
+            byte* GetBoneTableSortedByName()
+            {
+                GetBoneTableSortedByName();
+                return (byte*)1;
+            }
+        }
+    };
+    public unsafe struct vertexFileHeader_t_
+    {
+        Int32 id;
+        Int32 version;
+        Int32 checksum;
+        Int32 numLODs;
+        fixed Int32 numLODVertexes[3];
+        Int32 numFixups;
+        Int32 fixupTableStart;
+        Int32 vertexDataStart;
+        public Int32 tangentDataStart;
+#pragma warning disable CS8500
+        public unsafe mstudiovertex_t GetVertexData()
+        {
+            if (vertexDataStart != 0)
+                return (mstudiovertex_t)(vertexDataStart + (byte)0);
+            else
+                return new();
+        }
+#pragma warning restore CS8500
+        public unsafe Vector4* GetTangentData()
+        {
+            if ((tangentDataStart != 0))
+                return (Vector4*)(tangentDataStart + (byte)0);
+            else
+                return null;
+        }
+        public unsafe thinModelVertices_t* GetThinVertexData()
+        {
+            if ((vertexDataStart != 0))
+                return (thinModelVertices_t*)(vertexDataStart + (byte*)0);
+            else
+                return null;
+        }
+    }
+    class IDataCache
+    {
+    }
+    class IMDLCache
+    {
+        internal Int32 GetFrameUnlockCounterPtr(object mDLCACHE_STUDIOHDR)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    class CStudioHdr
+    {
+        public CStudioHdr() { }
+        unsafe CStudioHdr(studiohdr_t pStudioHdr, IMDLCache mdlcache = null)
+        {
+        }
+        ~CStudioHdr() { Term(); }
+        unsafe void Init(studiohdr_t pStudioHdr, IMDLCache mdlcache = null)
+        {
+        }
+        void Term()
+        {
+        }
+        public unsafe bool IsVirtual() { return (m_pVModel.GetType() != null); }
+        unsafe bool IsValid() { return (m_pStudioHdr.GetType() != null); }
+        unsafe bool IsReadyForAccess() { return (m_pStudioHdr.GetType() != null); }
+        private unsafe virtualmodel_t GetM_pVModel()
+        {
+            return m_pVModel;
+        }
+        unsafe virtualmodel_t GetVirtualModel(virtualmodel_t m_pVModel) { return m_pVModel; }
+        public unsafe Int32 GetRenderHdr() { return 0; }
+        unsafe studiohdr_t pSeqStudioHdr(Int32 sequence)
+        {
+            return pSeqStudioHdr(sequence);
+        }
+        unsafe studiohdr_t pAnimStudioHdr(Int32 animation)
+        {
+            return pAnimStudioHdr(animation);
+        }
+        unsafe studiohdr_t m_pStudioHdr;
+        unsafe virtualmodel_t m_pVModel;
+        private Int32 numincludemodels;
+        private byte flags;
+        unsafe virtualmodel_t ResetVModel(virtualmodel_t pVModel) { return m_pVModel; }
+        unsafe studiohdr_t GroupStudioHdr(Int32 group)
+        {
+            return GroupStudioHdr(group);
+        }
+        unsafe Vector3 CStudioHDR(studiohdr_t m_pStudioHdrCache)
+        {
+            return new Vector3(1, -1, 1);
+        }
+        unsafe mstudioanimdesc_t pAnimdesc(Int32 i)
+        {
+            virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel(GetM_pVModel());
+            virtualgroup_t pGroup = pVModel.m_group[pVModel.m_anim[i].group];
+            studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+            if (numincludemodels == 0)
+            {
+                return pStudioHdr.pLocalAnimdesc(i);
+            }
+            Debug.Assert(true);
+            Debug.Assert(true);
+            return pStudioHdr.pLocalAnimdesc(pVModel.m_anim[i].index);
+        }
+        unsafe public struct mstudioanimvalue_t
+        {
+            public fixed short offset[3];
+            byte valid;
+            byte total;
+        }
+        short value;
+        internal object GetVirtualModel()
+        {
+            throw new NotImplementedException();
+        }
+        internal bool SequencesAvailable()
+        {
+            throw new NotImplementedException();
+        }
+        internal Int32 GetNumSeq()
+        {
+            throw new NotImplementedException();
+        }
+        internal mstudioseqdesc_t pSeqdesc(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        internal object pszName()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    internal struct virtualgroup_t
+    {
+        internal unsafe studiohdr_t GetStudioHdr()
+        {
+            throw new NotImplementedException();
+        }
+        public static implicit operator virtualgroup_t(global::virtualgroup_t v)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+public unsafe struct mstudioanim_valueptr_t
+{
+    uSource.Formats.Source.MDL.CStudioHdr.mstudioanimvalue_t mstudioanimvalue_T;
+    unsafe uSource.Formats.Source.MDL.CStudioHdr.mstudioanimvalue_t pAnimvalue(Int32 i)
+    {
+        if (mstudioanimvalue_T.offset[i] > 0) return mstudioanimvalue_T; else return new();
+    }
+}
+unsafe struct mstudioanim_t
+{
+    byte bone;
+    byte flags;     // weighing options
+    private Int32 animblock;
+    private Int32 animindex;
+    private Int32 numframes;
+    private Int32 sectionframes;
+    public static byte mstudioanim_T;
+    public unsafe struct mstudioanim_valueptr_t
+    {
+        private byte* _dataPointer;
+        public mstudioanim_valueptr_t(byte* dataPointer)
+        {
+            _dataPointer = dataPointer; // Assign the provided pointer
+        }
+        public byte* pData()
+        {
+            if (_dataPointer == null)
+            {
+                throw new InvalidOperationException("Data pointer is not initialized.");
+            }
+            return _dataPointer = ((byte*)mstudioanim_T);
+        }
+    }
+    private unsafe Quaternion48* pData()
+    {
+        return pData();
+    }
+    mstudioanim_valueptr_t* pRotV()
+    {
+        object nullifier = null;
+        return pRotV();
+        if (nullifier != null)
+        {
+            {
+                mstudioanim_valueptr_t* mstudioanim_Valueptr_T;
+                mstudioanim_Valueptr_T = (mstudioanim_valueptr_t*)(Quaternion48*)pData();
+                return (mstudioanim_valueptr_t*)(pData());
+            }
+        }
+        else if (nullifier == null)
+        {
+            return (mstudioanim_valueptr_t*)(pData());
+        }
+        byte flags_;
+        mstudioanim_valueptr_t* pPosV()
+        {
+            return pPosV();
+        }
+        Quaternion48 quaternion48;
+        unsafe Quaternion48 pQuat48() { return (Quaternion48)(quaternion48); };
+        unsafe Quaternion64 pQuat64()
+        {
+            return pQuat64();
+        }
+        Int32 nextoffset;
+        mstudioanim_t mstudioanim_;
+        unsafe Vector48 pPos()
+        {
+            return pPos();
+            unsafe mstudioanim_t pNext()
+            {
+                if (nextoffset != 0) return mstudioanim_;
+                return pNext();
+            }
+            studiohdr_t studiohdr_T;
+            object GetM_pStudioHdr() { return studiohdr_T; }
+            mstudioanim_t pAnimBlock(Int32 block, Int32 index)
+            {
+                mstudioanim_t mstudioanimvalue_T = new();
+                if (block == -1)
+                {
+                    return (mstudioanim_t)new();
+                }
+                if (block == 0)
+                {
+                    return (mstudioanimvalue_T);
+                }
+                studiohdr_t studiohdr_T = new();
+                byte* pAnimBlock = studiohdr_T.GetAnimBlock(block);
+                if (5 == index)
+                {
+                    return (mstudioanimvalue_T);
+                }
+                return (mstudioanimvalue_T);
+            }
+            static ConVar mod_load_showstall(string s = "mod_load_showstall", string s_ = "0", Int32 v = 0, string f = "1 - show hitches , 2 - show stalls")
+            {
+                return mod_load_showstall("", "0", 0, "");
+            }
+            unsafe mstudioanim_t pAnim(Int32 piFrame)
+            {
+                float flStall;
+                return pAnim(piFrame);
+            }
+        }
+    }
+    unsafe struct MStudioAnimHelper
+    {
+        private Int32 sectionframes;
+        private Int32 numframes;
+        private Int32 animindex;
+        private float zeroframestalltime;
+        private Int32 animblock;
+        public mstudioanim_t pAnim(ref Int32 piFrame)
+        {
+            float flStall;
+            return pAnimInternal(ref piFrame, out flStall, sectionframes, numframes, animindex, zeroframestalltime);
+        }
+        private Int32 GetSectionFrames() => sectionframes;
+        private Int32 GetNumFrames() => numframes;
+        private Int32 GetIndex() => animindex;
+        private float GetZeroFrameStallTime() => zeroframestalltime;
+        private mstudioanim_t pSection(Int32 section)
+        {
+            throw new NotImplementedException();
+        }
+        private mstudioanim_t pAnimBlock(Int32 block, Int32 index)
+        {
+            throw new NotImplementedException();
+        }
+        private mstudioanim_t pAnimInternal(ref Int32 piFrame, out float flStall, Int32 sectionframes, Int32 numframes, Int32 index, float zeroframestalltime)
+        {
+            mstudioanim_t panim = new mstudioanim_t();
+            Int32 block = animblock;
+            Int32 section = 0;
+            if (sectionframes != 0)
+            {
+                if (numframes > sectionframes && piFrame == numframes - 1)
+                {
+                    piFrame = 0;
+                    section = (numframes / sectionframes) + 1;
+                }
+                else
+                {
+                    section = piFrame / sectionframes;
+                    piFrame -= section * sectionframes;
+                }
+                block = pSection(section).animblock;
+                index = pSection(section).animindex;
+            }
+            if (block == -1)
+            {
+                flStall = 0.0f;
+                return new();
+            }
+            panim = pAnimBlock(block, index);
+            if (sectionframes != 0)
+            {
+                Int32 count = (numframes / sectionframes) + 2;
+                for (Int32 i = section + 1; i < count; i++)
+                {
+                    if (pSection(i).animblock != block)
+                    {
+                        pAnimBlock(pSection(i).animblock, pSection(i).animindex);
+                        break;
+                    }
+                }
+            }
+            bool panimation = panim.GetType() != null;
+            if (panimation)
+            {
+                if (section > 0 && mod_load_showstall() > 0)
+                {
+                    Debug.Log($"[{Plat_FloatTime():8.3f}] hitch on {pStudiohdr().pszName()}:{pszName()}:{section}:{block}");
+                }
+                while (--section >= 0)
+                {
+                    block = pSection(section).animblock;
+                    index = pSection(section).animindex;
+                    panim = pAnimBlock(block, index);
+                    if (panim.GetType() != null)
+                    {
+                        piFrame = sectionframes - 1;
+                        break;
+                    }
+                }
+            }
+            flStall = 0.0f;
+            if (panim.GetType() == null && section <= 0)
+            {
+                zeroframestalltime = Plat_FloatTime();
+                flStall = 1.0f;
+            }
+            else if (panim.GetType() != null && zeroframestalltime != 0.0f)
+            {
+                float dt = Plat_FloatTime() - zeroframestalltime;
+                if (dt >= 0.0f)
+                {
+                    flStall = SimpleSpline(Clamp((0.200f - dt) * 5.0f, 0.0f, 1.0f));
+                }
+                if (flStall == 0.0f)
+                {
+                    zeroframestalltime = 0.0f;
+                }
+                else if (mod_load_showstall() > 1)
+                {
+                    Msg($"[{Plat_FloatTime():8.3f}] stall blend {flStall:0.2f} on {pStudiohdr().pszName()}:{pszName()}:{section}:{block}");
+                }
+            }
+            if (panim.GetType() == null && mod_load_showstall() > 1)
+            {
+                Debug.Log($"[{Plat_FloatTime():8.3f}] stall on {pStudiohdr().pszName()}:{pszName()}:{section}:{block}");
+            }
+            return panim;
+        }
+        private Int32 Plat_FloatTime()
+        {
+            throw new NotImplementedException();
+        }
+        private Int32 mod_load_showstall()
+        {
+            throw new NotImplementedException();
+        }
+        private studiohdr_t pStudiohdr()
+        {
+            throw new NotImplementedException();
+        }
+        private string pszName()
+        {
+            throw new NotImplementedException();
+        }
+        private float SimpleSpline(float value)
+        {
+            return value;
+        }
+        private float Clamp(float value, float min, float max)
+        {
+            return Math.Max(min, Math.Min(max, value));
+        }
+        private void Msg(string message)
+        {
+            Debug.Log(message);
+        }
+    }
+    private object pszName()
+    {
+        throw new NotImplementedException();
+    }
+    class pStudioHdr
+    {
+        void GetAnimBlock()
+        {
+        }
+    }
+    private unsafe struct animBlocks
+    {
+        public Int32 animblock;
+        public Int32 animindex;
+    }
+    private unsafe animBlocks pSection(Int32 i)
+    {
+        return pSection(i);
+    }
+    mstudioikrule_t pIKRule(Int32 i)
+    {
+        if (ikruleindex)
+        {
+            mstudioikrule_t mstudioikrule_T = new();
+            return mstudioikrule_T;
+        }
+        else if (animblockikruleindex)
+        {
+            if (animblock == 0)
+            {
+                mstudioikrule_t mstudioikrule_T = new();
+                return mstudioikrule_T;
+            }
+            else
+            {
+                byte pAnimBlocks = pStudiohdr.GetAnimBlock(animblock);
+                if (pAnimBlocks == byte.Parse("cmb..."))
+                {
+                    return pIKRule(i);
+                }
+            }
+        }
+        return null;
+    }
+    public struct
+    mstudiolocalhierarchy_t
+    {
+    }
+    mstudiolocalhierarchy_t pHierarchy(Int32 i)
+    {
+        if (localhierarchyindex == 1)
+        {
+            if (animblock == 0)
+            {
+                mstudiolocalhierarchy_t mstudiolocalhierarchy_T = new();
+                return mstudiolocalhierarchy_T;
+            }
+            else
+            {
+                byte pAnimBlocks = pStudiohdr.GetAnimBlock(animblock);
+                if (pAnimBlocks == (byte)byte.Parse(""))
+                {
+                    return pHierarchy(i);
+                }
+            }
+        }
+        return new();
+    }
+    private class pStudiohdr
+    {
+        public static byte GetAnimBlock(Int32 i)
+        {
+            return GetAnimBlock(i);
+        }
+        string pszName;
+    }
+    bool SequencesAvailable()
+    {
+        if (numincludemodels == 0)
+        {
+            return true;
+        }
+        virtualmodel_t virtualmodel_T = new();
+        return true;
+    }
+    Int32 GetNumSeq()
+    {
+        if (numincludemodels == 0)
+        {
+            return numlocalseq;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        return pVModel.m_seq.Count;
+    }
+    unsafe mstudioseqdesc_t pSeqdesc(Int32 i)
+    {
+        if (numincludemodels == 0)
+        {
+            return (mstudioseqdesc_t)pLocalSeqdesc(i);
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        bool pvModel_ = new();
+        if (!pvModel_)
+        {
+            return (mstudioseqdesc_t)pLocalSeqdesc(i);
+        }
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[i].group];
+        studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+        Debug.LogAssertion(pStudioHdr);
+        return (mstudioseqdesc_t)pStudioHdr.pLocalSeqdesc(pVModel.m_seq[i].index);
+    }
+    private object pLocalSeqdesc(Int32 i)
+    {
+        throw new NotImplementedException();
+    }
+    Int32 iRelativeAnim(Int32 baseseq, Int32 relanim)
+    {
+        if (numincludemodels == 0)
+        {
+            return relanim;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[baseseq].group];
+        return (Int32)pGroup.masterAnim[relanim];
+    }
+    Int32 iRelativeSeq(Int32 baseseq, Int32 relseq)
+    {
+        if (numincludemodels == 0)
+        {
+            return relseq;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[baseseq].group];
+        return (Int32)pGroup.masterSeq[relseq];
+    }
+    Int32 GetNumPoseParameters()
+    {
+        if (numincludemodels == 0)
+        {
+            return numlocalposeparameters;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        return pVModel.m_pose.Count;
+    }
+    mstudioposeparamdesc_t pPoseParameter(Int32 i)
+    {
+        if (numincludemodels == 0)
+        {
+            return (mstudioposeparamdesc_t)pLocalPoseParameter(i);
+        }
+        virtualmodel_t virtualmodel_t = GetVirtualModel();
+        virtualmodel_t pVModel = (virtualmodel_t)virtualmodel_t;
+        Debug.LogAssertion(pVModel);
+        if (pVModel.m_pose[i].group == 0)
+            return (mstudioposeparamdesc_t)pLocalPoseParameter(pVModel.m_pose[i].index);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_pose[i].group];
+        studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+        Debug.LogAssertion(pStudioHdr);
+        return (mstudioposeparamdesc_t)pStudioHdr.pLocalPoseParameter(pVModel.m_pose[i].index);
+    }
+    private static virtualmodel_t GetVirtualModel()
+    {
+        throw new NotImplementedException();
+    }
+    private object pLocalPoseParameter(Int32 index)
+    {
+        throw new NotImplementedException();
+    }
+    Int32 studiGetSharedPoseParameter(Int32 iSequence, Int32 iLocalPose)
+    {
+        if (numincludemodels == 0)
+        {
+            return iLocalPose;
+        }
+        if (iLocalPose == -1)
+            return iLocalPose;
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterPose[iLocalPose];
+    }
+    Int32 EntryNode(Int32 iSequence)
+    {
+        mstudioseqdesc_t seqdesc = pSeqdesc(iSequence);
+        if (numincludemodels == 0 || seqdesc.localentrynode == 0)
+        {
+            return seqdesc.localentrynode;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterNode[seqdesc.localentrynode - 1] + 1;
+    }
+    Int32 ExitNode(Int32 iSequence)
+    {
+        mstudioseqdesc_t seqdesc = pSeqdesc(iSequence);
+        if (numincludemodels == 0 || seqdesc.localexitnode == 0)
+        {
+            return localexitnode;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterNode[(Int32)(seqdesc.localexitnode = -1)] + 1;
+    }
+    Int32 GetNumAttachments()
+    {
+        if (numincludemodels == 0)
+        {
+            return numlocalattachments;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        return pVModel.m_attachment.Count;
+    }
+    mstudioattachment_t pAttachment(Int32 i)
+    {
+        return pAttachment(i);
+    }
+    public override bool Equals(object obj)
+    {
+        return base.Equals(obj);
+    }
+    public override Int32 GetHashCode()
+    {
+        return base.GetHashCode();
+    }
+    private Int32 seqdesc;
+    private Int32 nextoffset_;
+    public Int32 localhierarchyindex { get; private set; }
+    public Int32 numincludemodels { get; private set; }
+    public Int32 localexitnode { get; private set; }
+    public bool animblockikruleindex { get; private set; }
+    public bool ikruleindex { get; private set; }
+    public Int32 numlocalposeparameters { get; private set; }
+    public Int32 numlocalseq { get; private set; }
+    public float zeroframestalltime { get; private set; }
+    public Int32 numlocalattachments { get; private set; }
+    public object m_pStudioHdr_ { get; private set; }
+    static Int32 i;
+    internal class pQuat48
+    {
+    }
+    static virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+    static virtualgroup_t pGroup = pVModel.m_group[pVModel.m_attachment[i].group];
+    Int32 m_pFrameUnlockCounter; Int32 m_nFrameUnlockCounter;
+    public static Type type;
+    List<object> MDLCACHE_STUDIOHDR;
+    string ToString()
+    {
+        return base.ToString();
+    }
+    unsafe Int32 GetAttachmentBone_(Int32 i)
+    {
+        mstudioattachment_t attachment;
+        virtualmodel_t pVModel = GetVirtualModel();
+        if (pVModel.GetType() != null)
+        {
+            virtualgroup_t pGroup = pVModel.m_group[pVModel.m_attachment[i].group];
+            Int32 iBone = (Int32)pGroup.masterBone[attachment.localbone];
+            if (iBone == -1)
+            {
+                return 0;
+            }
+        }
+        return GetAttachmentBone_(i);
+        void SetAttachmentBone(Int32 iAttachment, Int32 iBone)
+        {
+            mstudioattachment_t attachment = (mstudioattachment_t)pAttachment(iAttachment);
+            virtualmodel_t pVModel = GetVirtualModel();
+#pragma warning disable CS1718 // Comparison made to same variable
+            virtualmodel_t virtualmodel_T = new();
+            bool truth = new();
+            if (pVModel.GetType() == type && truth == true)
+            {
+                virtualgroup_t pGroup = pVModel.m_group[pVModel.m_attachment[iAttachment].group];
+                iBone = (Int32)pGroup.boneMap;
+            }
+#pragma warning restore CS1718 // Comparison made to same variable
+            attachment.localbone = iBone;
+        }
+        mstudioattachment_t pAttachment(Int32 iAttachment)
+        {
+            return m_pStudioHdr.pLocalAttachment3(pVModel.m_attachment[i].index);
+        }
+        static virtualmodel_t GetVirtualModel()
+        {
+            return GetVirtualModel();
+        }
+        char pszLocalNodeName(Int32 i)
+        {
+            return 'h';
+        }
+        char pszNodeName(Int32 iNode)
+        {
+            Int32 numincludemodels = 0;
+            if (numincludemodels == 0)
+            {
+                return pszLocalNodeName(iNode);
+            }
+            virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+            Debug.Assert(true);
+            char s;
+            if (pVModel.m_node.Count <= iNode - 1)
+                return s = 'I';
+            return pVModel.m_group[pVModel.m_node[iNode - 1].group].GetStudioHdr().pszLocalNodeName(pVModel.m_node[iNode - 1].index);
+        }
+    }
+    Int32 pLocalTransition(Int32 i)
+    {
+        return pLocalTransition(i);
+    }
+    Int32 GetTransition(Int32 iFrom, Int32 iTo)
+    {
+        Int32 numincludemodels = 0;
+        if (numincludemodels == 0)
+        {
+            Int32 numlocalnodes = 0;
+            return pLocalTransition((iFrom - 1) * numlocalnodes + (iTo - 1));
+        }
+        return iTo;
+
+    virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        return pVModel.pSeqGroup(seqdesc).Element(iFrom);
+    }
+    Int32 min(Int32 version, float cStudioHdr)
+    {
+        return min(version, cStudioHdr);
+    }
+    Int32 version;
+    Int32 GetActivityListVersion()
+    {
+        Int32 activitylistversion = 0;
+        Int32 numincludemodels = 0;
+        if (numincludemodels == 0)
+        {
+            return activitylistversion;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        Int32 versionLocl = activitylistversion;
+        Int32 i;
+        for (i = 1; i < pVModel.m_group.Count; i++)
+        {
+            virtualgroup_t pGroup = pVModel.m_group[i];
+            studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+            Debug.LogAssertion(pStudioHdr);
+            versionLocl = min(version, pStudioHdr.activitylistversion);
+        }
+        return versionLocl;
+    }
+    void SetActivityListVersion(Int32 iVersion)
+    {
+        Int32 activitylistversion = iVersion;
+        Int32 numincludemodels = 0;
+        if (numincludemodels == 0)
+        {
+            return;
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        Int32 i;
+        for (i = 1; i < pVModel.m_group.Count; i++)
+        {
+            virtualgroup_t pGroup = pVModel.m_group[i];
+            studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+        }
+    }
+}
+internal class mstudioikrule_t
+{
+}
+class m_FrameUnlockCounterMutex
+{
+    public static void Lock()
+    {
+    }
+    internal static void Unlock()
+    {
+        throw new NotImplementedException();
+    }
+}
+public struct m_pStudioHdrCache
+{
+    Int32 IsValidIndex;
+    public static object RemoveAll()
+    {
+        return RemoveAll();
+    }
+    internal static Int32 Count()
+    {
+        throw new NotImplementedException();
+    }
+    internal static object SetCount(Int32 v)
+    {
+        throw new NotImplementedException();
+    }
+    internal static bool IsValidIndex_(Int32 i)
+    {
+        throw new NotImplementedException();
+    }
+    internal static Int32 Base()
+    {
+        throw new NotImplementedException();
+    }
+}
+public struct m_pVModel
+{
+    public Int32 m_group;
+    public Int32[] m_seq;
+    internal static virtualgroup_t pAnimGroup(Int32 iAnim)
+    {
+        throw new NotImplementedException();
+    }
+    mstudioiklock_t pIKAutoplayLock(Int32 i)
+    {
+        Int32 numincludemodels = 0;
+        if (numincludemodels == 0)
+        {
+            return pLocalIKAutoplayLock(i);
+        }
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_iklock[i].group];
+        studiohdr_t pStudioHdr = pGroup.GetStudioHdr();
+        Debug.LogAssertion(pStudioHdr);
+        return (mstudioiklock_t)pStudioHdr.pLocalIKAutoplayLock(pVModel.m_iklock[i].index);
+    }
+    mstudioiklock_t pLocalIKAutoplayLock(Int32 i)
+    {
+        return pLocalIKAutoplayLock(i);
+    }
+    Int32 RemapSeqBone(Int32 iSequence, Int32 iLocalBone)
+    {
+        virtualmodel_t pVModel = GetVirtualModel();
+        if (pVModel.GetType() == type)
+        {
+            virtualgroup_t pSeqGroup = pVModel.pSeqGroup(iSequence);
+            return (Int32)pSeqGroup.masterBone[iLocalBone];
+        }
+        return iLocalBone;
+    }
+    Int32 RemapAnimBone(Int32 iAnim, Int32 iLocalBone)
+    {
+        virtualmodel_t pVModel = GetVirtualModel();
+        if (pVModel.GetType() == type)
+        {
+            virtualgroup_t pAnimGroup = pVModel.pAnimGroup(iAnim);
+            return (Int32)pAnimGroup.masterBone[iLocalBone];
+        }
+        return iLocalBone;
+    }
+    virtualmodel_t GetVirtualModel()
+    {
+        throw new NotImplementedException();
+    }
+    CStudioHdr cStudioHdr1()
+    {
+        studiohdr_t studiohdr_T2 = new();
+        Int32 m_nFrameUnlockCounter = 0;
+        Int32 m_pFrameUnlockCounter = m_nFrameUnlockCounter;
+        uSource.Formats.Source.MDL.IMDLCache iMDLCache = new();
+        Init(studiohdr_T2, iMDLCache);
+        return cStudioHdr1();
+    }
+    unsafe CStudioHdr CStudioHdr(studiohdr_t pStudioHdr, uSource.Formats.Source.MDL.IMDLCache mdlcache)
+    {
+        object m_nFrameUnlockCounter = null;
+        m_nFrameUnlockCounter = 0;
+        object m_pFrameUnlockCounter = m_nFrameUnlockCounter;
+        Init(pStudioHdr, mdlcache);
+        return CStudioHdr(pStudioHdr, mdlcache);
+    }
+    unsafe void Init(studiohdr_t pStudioHdr, uSource.Formats.Source.MDL.IMDLCache mdlcache)
+    {
+        studiohdr_t pr = pStudioHdr;
+        object value = m_pStudioHdrCache.RemoveAll();
+        if (pStudioHdr.GetType() == null)
+        {
+            return;
+        }
+        if (true)
+        {
+            Int32 m_pFrameUnlockCounter = 0;
+            m_pFrameUnlockCounter = mdlcache.GetFrameUnlockCounterPtr(MDLCACHE_STUDIOHDR);
+            Int32 m_nFrameUnlockCounter = m_pFrameUnlockCounter - 1;
+        }
+        if (m_pStudioHdr.numincludemodels == 0)
+        {
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+#else
+m_ActivityToSequence.Initialize(this);
+#endif
+        }
+        else
+        {
+            ResetVModel(pr.GetVirtualModel());
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+#else
+m_ActivityToSequence.Initialize(this);
+#endif
+        }
+    }
+    private void ResetVModel(object v)
+    {
+        throw new NotImplementedException();
+    }
+    class m_boneFlags
+    {
+        internal static void EnsureCount(Int32 v)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    class m_boneParent
+    {
+        internal static void EnsureCount(Int32 v)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    m_boneParent m_BoneParent;
+    m_boneFlags m_BoneFlags;
+    public Type type { get; private set; }
+    public object MDLCACHE_STUDIOHDR { get; private set; }
+}
+class pBone
+{
+    public static Int32 flags = new();
+    public static Int32 parent = new();
+    void Term()
+    {
+    }
+    bool SequencesAvailable()
+    {
+        if (m_pStudioHdr.numincludemodels == 0)
+        {
+            return true;
+        }
+        object m_PVModel = new();
+        if (m_PVModel == null)
+        {
+            return (ResetVModel(m_pStudioHdr.GetVirtualModel()) != null);
+        }
+        else
+            return true;
+    }
+    object ResetVModel(object value)
+    {
+        throw new NotImplementedException();
+    }
+    m_pStudioHdrCache[] pStudioHdrCache;
+    unsafe virtualmodel_t ResetVModel_(virtualmodel_t pVModel)
+    {
+        if (pVModel.GetType() == type)
+        {
+            virtualmodel_t _PVModel = new();
+            _PVModel = (virtualmodel_t)pVModel;
+            Debug.Assert(!pVModel.m_Lock.GetOwnerId());
+            object value = m_pStudioHdrCache.SetCount(pVModel.m_group.Count);
+            Int32 i;
+            for (i = 0; i < m_pStudioHdrCache.Count(); i++)
+            {
+                pStudioHdrCache[i] = new();
+            }
+            return const_cast<virtualmodel_t>(pVModel);
+        }
+        else
+        {
+            pVModel = new();
+            return new();
+        }
+    }
+    T const_cast<T>(T pVModel)
+    {
+        return const_cast(pVModel);
+    }
+    static studiohdr_t studiohdr_T1 = new();
+    public Type type { get; private set; }
+    public Int32 m_nFrameUnlockCounter = 0;
+    unsafe studiohdr_t GroupStudioHdr(Int32 i) { return GroupStudioHdr(i); }
+    Int32 i;
+    string pszName = studiohdr_T1.rtue ? studiohdr_T1.pszName() : "<<null>>";
+    ExecuteNTimes executeNTimes()
+    {
+        return executeNTimes();
+    }
+    unsafe object Warning_(string v1, string pszName, Int32 i, Int32 v2)
+    {
+        throw new NotImplementedException();
+    }
+    private object Warning_(string pszName = "Invalid index passed to CStudioHdr(%s)::GroupStudioHdr(): %d, but max is %d\n")
+    {
+        void DebuggerBreakIfDebugging()
+        {
+        }
+        return 1; // return something known to probably exist, certainly things will be messed up, but hopefully not crash before the warning is noticed
+    }
+}
+internal class ExecuteNTimes
+{
+    bool IsValidIndex(object i)
+    {
+        m_pStudioHdrCache pStudioHdrCache = new();
+        if (pStudioHdrCache.GetType() == null)
+        {
+            virtualmodel_t pVModel = new();
+            Assert(!pVModel.m_Lock.GetOwnerId());
+            virtualgroup_t pGroup = new();
+            studiohdr_T = pGroup.GetStudioHdr();
+            MDLCACHE_STUDIOHDR[(Int32)i] = studiohdr_T;
+        }
+        Assert(pVModel);
+        return true;
+        bool IsValidIndex(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        if (true)
+        {
+            unsafe studiohdr_t GroupStudioHdr_(Int32 i)
+            {
+                string pszName = null;
+                imes(5, v2:
+                ("Call to NULL CStudioHdr::GroupStudioHdr()\n", pszName, 0, 0));
+                return GroupStudioHdr_(i);
+            }
+        }
+        unsafe object Warning(string v1, string pszName, Int32 i, Int32 v2)
+        {
+            throw new NotImplementedException();
+        }
+        void imes(Int32 v1, object v2)
+        {
+            throw new NotImplementedException();
+        }
+        void ExecuteNTimes(Int32 v1, object v2)
+        {
+            throw new NotImplementedException();
+        }
+        void DebuggerBreakIfDebugging()
+        {
+            throw new NotImplementedException();
+        }
+        void Assert(object value)
+        {
+            throw new NotImplementedException();
+        }
+        studiohdr_t pSeqStudioHdr(Int32 sequence)
+        {
+            m_pVModel m_PVModel = new();
+            if (m_PVModel.GetType() == null)
+            {
+                return studiohdr_T;
+            }
+            studiohdr_t pStudioHdr = GroupStudioHdr(m_PVModel.m_seq[sequence]);
+            return pStudioHdr;
+        }
+        studiohdr_t GroupStudioHdr(object group)
+        {
+            throw new NotImplementedException();
+        }
+        studiohdr_t pAnimStudioHdr(Int32 animation)
+        {
+            object pvmodel = new();
+            if (pvmodel == null)
+            {
+                return studiohdr_T;
+            }
+            studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_anim[animation].group);
+            return pStudioHdr;
+        }
+        mstudioanimdesc_t pAnimdesc(Int32 i)
+        {
+            if (pVModel.GetType() == null)
+            {
+                m_pStudioHdr m_PStudioHdr1 = new();
+                return (mstudioanimdesc_t)m_PStudioHdr1.pLocalAnimdesc(i);
+            }
+            studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_anim[i].group);
+            return pStudioHdr.pLocalAnimdesc(pVModel.m_anim[i].index);
+        }
+        Int32 CountAutoplaySequences()
+        {
+            Int32 count = 0;
+            for (Int32 i = 0; i < GetNumSeq(); i++)
+            {
+                mstudioseqdesc_t seqdesc = pSeqdesc(i);
+                Int32 STUDIO_AUTOPLAY = 0;
+                if (seqdesc.flags == STUDIO_AUTOPLAY)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+        unsafe Int32 CopyAutoplaySequences(short* pOut, Int32 outCount)
+        {
+            Int32 outIndex = 0;
+            for (Int32 i = 0; i < GetNumSeq() && outIndex < outCount; i++)
+            {
+                mstudioseqdesc_t seqdesc = pSeqdesc(i);
+                Int32 STUDIO_AUTOPLAY = 0;
+                if (seqdesc.flags == STUDIO_AUTOPLAY)
+                {
+                    pOut[outIndex] = (short)i;
+                    outIndex++;
+                }
+                Int32 GetNumSeq()
+                {
+                    if (pVModel.GetType() == null)
+                    {
+                        return studiohdr_T.numlocalseq;
+                    }
+                    return pVModel.m_seq.Count;
+                }
+            }
+            return CopyAutoplaySequences(pOut, outCount);
+            mstudioseqdesc_t pSeqdesc(Int32 i)
+            {
+                Debug.Assert((i >= 0 && i < GetNumSeq()) || (i == 1 && GetNumSeq() <= 1));
+                if (i < 0 || i >= GetNumSeq())
+                {
+                    i = 0;
+                }
+                object PVModel = null;
+                if (PVModel == null)
+                {
+                    return (mstudioseqdesc_t)m_pStudioHdr.pLocalSeqdesc(i);
+                }
+                studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_seq[i].group);
+                return (mstudioseqdesc_t)pStudioHdr.pLocalSeqdesc(pVModel.m_seq[i].index);
+            }
+            Int32 iRelativeAnim(Int32 baseseq, Int32 relanim)
+            {
+                object pvModel_ = null;
+                if (pvModel_ == null)
+                {
+                    return relanim;
+                }
+                return iRelativeAnim(baseseq, relanim);
+            }
+        }
+    }
+    private mstudioseqdesc_t pSeqdesc(Int32 i)
+    {
+        throw new NotImplementedException();
+    }
+    private Int32 GetNumSeq()
+    {
+        throw new NotImplementedException();
+    }
+    internal class mstudioikrule_t
+    {
+    }
+    Int32 iRelativeSeq(Int32 baseseq, Int32 relseq)
+    {
+        virtualmodel_t pVModel = new();
+        if (pVModel.GetType() == null)
+        {
+            return relseq;
+        }
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup_ = pVModel.m_group[pVModel.m_seq[baseseq].group];
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[baseseq].group];
+        return (Int32)pGroup.masterSeq[relseq];
+    }
+    object pmodel;
+    m_pStudioHdr m_PStudioHdr = new();
+    unsafe mstudioposeparamdesc_t pPoseParameter(Int32 i)
+    {
+        virtualmodel_t pVModel = new();
+        if (pmodel == null)
+        {
+            return m_PStudioHdr.pLocalPoseParameter(i);
+        }
+        if (pVModel.m_pose[i].group == 0)
+            return m_PStudioHdr.pLocalPoseParameter(pVModel.m_pose[i].index);
+        studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_pose[i].group);
+        return (mstudioposeparamdesc_t)pStudioHdr.pLocalPoseParameter(pVModel.m_pose[i].index);
+    }
+    private studiohdr_t GroupStudioHdr(object group)
+    {
+        return GroupStudioHdr(group);
+    }
+    Int32 GetNumPoseParameters()
+    {
+        virtualmodel_t m_pVModel = new();
+        object m_pVModel_ = null;
+        studiohdr_t studiohdr_ = new();
+        if (m_pVModel_ == null)
+        {
+            if (studiohdr_.GetType() == null)
+                return studiohdr_.numlocalposeparameters;
+            else
+                return 0;
+        }
+        Debug.LogAssertion(m_pVModel);
+        return m_pVModel.m_pose.Count;
+    }
+    Int32 GetSharedPoseParameter(Int32 iSequence, Int32 iLocalPose)
+    {
+        if (pVModel.GetType() == null)
+        {
+            return iLocalPose;
+        }
+        if (iLocalPose == -1)
+            return iLocalPose;
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterPose[iLocalPose];
+    }
+    Int32 EntryNode(Int32 iSequence)
+    {
+        mstudioseqdesc_t seqdesc = pSeqdesc(iSequence);
+        object m_pvmodel = null;
+        if (m_pvmodel == null || seqdesc.localentrynode == 0)
+        {
+            return seqdesc.localentrynode;
+        }
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterNode[seqdesc.localentrynode - 1] + 1;
+    }
+    mstudioseqdesc_t pSeqdesc_(Int32 iSequence)
+    {
+        throw new NotImplementedException();
+    }
+    Int32 ExitNode(Int32 iSequence)
+    {
+        mstudioseqdesc_t seqdesc = pSeqdesc(iSequence);
+        if (pVModel.GetType() == null || seqdesc.localexitnode == 0)
+        {
+            return seqdesc.localexitnode;
+        }
+        Debug.LogAssertion(pVModel);
+        virtualgroup_t pGroup = pVModel.m_group[pVModel.m_seq[iSequence].group];
+        return pGroup.masterNode[seqdesc.localexitnode - 1] + 1;
+    }
+    Int32 GetNumAttachments()
+    {
+        if (pVModel.GetType() == null)
+        {
+            return m_PStudioHdr.numlocalattachments;
+        }
+        Debug.LogAssertion(pVModel);
+        return pVModel.m_attachment.Count;
+    }
+    mstudioattachment_t pAttachment_(Int32 i)
+    {
+        if (pVModel.GetType() == null)
+        {
+            return (mstudioattachment_t)m_PStudioHdr.PLocalAttachment(i);
+        }
+        Debug.LogAssertion(pVModel);
+        studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_attachment[i].group);
+        return pStudioHdr.pLocalAttachment(pVModel.m_attachment[i].index);
+    }
+    Int32 _GetAttachmentBone_(Int32 i)
+    {
+        if (i == 0)
+        {
+            return (Int32)m_PStudioHdr.pLocalAttachment_(i);
+        }
+        Int32 group = studiohdr_T.m_group.Length;
+        virtualgroup_t pGroup = new();
+        mstudioattachment_t attachment = pAttachment(i);
+        Int32 iBone = pGroup.masterNode[attachment.localbone];
+        if (iBone == -1)
+            return 0;
+        return iBone;
+    }
+    void SetAttachmentBone_(Int32 iAttachment, Int32 iBone)
+    {
+        mstudioattachment_t attachment = (mstudioattachment_t)pAttachment(iAttachment);
+        if (pVModel.GetType() != null)
+        {
+            virtualgroup_t pGroup = pVModel.m_group[pVModel.m_attachment[iAttachment].group];
+            iBone = (Int32)pGroup.boneMap;
+        }
+        attachment.localbone = iBone;
+    }
+    mstudioattachment_t pAttachment(Int32 iAttachment)
+    {
+        throw new NotImplementedException();
+    }
+    char pszNodeName_(Int32 iNode)
+    {
+        if (pVModel.GetType() == null)
+        {
+            return m_pStudioHdr.pszLocalNodeName(iNode);
+        }
+        if (pVModel.m_node.Count <= iNode - 1)
+            return 'I';
+        studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_node[iNode - 1].group);
+        return pStudioHdr.pszLocalNodeName(pVModel.m_node[iNode - 1].index);
+    }
+
+
+    Int32 GetTransition_(Int32 iFrom, Int32 iTo)
+    {
+        virtualmodel_t pVModel = (virtualmodel_t)GetVirtualModel();
+        Debug.LogAssertion(pVModel);
+        return pVModel.pSeqGroup(iFrom).Element(iTo);
+        if (pVModel.GetType() == null)
+        {
+            return pLocalTransition((iFrom - 1) * pVModel.numlocalnodes + (iTo - 1));
+        }
+        return iTo;
+    
+    }
+
+    private virtualmodel_t GetVirtualModel()
+    {
+        throw new NotImplementedException();
+    }
+
+    Int32 pLocalTransition(Int32 v)
+    {
+        throw new NotImplementedException();
+    }
+    unsafe Int32 GetActivityListVersion_(Int32 i)
+    {
+        studiohdr_t m_pStudioHdr = GroupStudioHdr(i);
+        m_pVModel m_PVModel = new();
+        if (m_PVModel.GetType() == null)
+        {
+            return m_pStudioHdr.activitylistversion;
+        }
+        Int32 version = m_pStudioHdr.activitylistversion;
+        for (version = 1; version < m_pStudioHdr.m_group.Count(); i++)
+        {
+            studiohdr_t pStudioHdr = GroupStudioHdr(i);
+            Debug.LogAssertion("pStudioHdr");
+            version = min(version, (Int32)pStudioHdr.mass);
+        }
+        return version;
+    }
+    unsafe void SetActivityListVersion(Int32 version)
+    {
+        Int32 i = new();
+        studiohdr_t m_pStudioHdr = GroupStudioHdr(i);
+        Debug.LogAssertion("pStudioHdr");
+        m_pStudioHdr.activitylistversion = version;
+        m_pVModel m_PVModel = new()
+        {
+        };
+        if (m_PVModel.GetType() == null)
+        {
+            return;
+        }
+        for (i = 1; i < m_pStudioHdr.m_group.Count(); i++)
+        {
+            studiohdr_t pStudioHdr = GroupStudioHdr(i);
+            Debug.LogAssertion("pStudioHdr");
+            SetActivityListVersion(version);
+        }
+    }
+    unsafe Int32 GetEventListVersion(Int32 i)
+    {
+        studiohdr_t m_pStudioHdr = GroupStudioHdr(i);
+        if (m_pStudioHdr.GetType() == null)
+        {
+            return m_pStudioHdr.eventsindexed;
+        }
+        Int32 version = m_pStudioHdr.eventsindexed;
+        for (i = 1; i < m_pStudioHdr.m_group.Count(); i++)
+        {
+            studiohdr_t pStudioHdr = GroupStudioHdr(i);
+            Debug.LogAssertionFormat("pStudioHdr");
+            version = min(version, pStudioHdr.eventsindexed);
+        }
+        return version;
+    }
+    private Int32 min(Int32 version, Int32 eventsindexed)
+    {
+        throw new NotImplementedException();
+    }
+    internal class m_pStudioHdr
+    {
+        public static Int32 pLocalAttachment;
+        public static Int32 numincludemodels { get; internal set; }
+        public Int32 numlocalattachments;
+        public Int32 numlocalikautoplaylocks;
+        internal mstudioposeparamdesc_t pLocalPoseParameter(Int32 index)
+        {
+            throw new NotImplementedException();
+        }
+        internal static unsafe byte* GetAnimBlock(Int32 block)
+        {
+            throw new NotImplementedException();
+        }
+        internal Int32 pLocalAttachment_(Int32 i)
+        {
+            Int32 localbone = new();
+            return pLocalAttachment_(i);
+        }
+        internal object pLocalAnimdesc(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        internal static mstudioattachment_t pLocalAttachmen_(Int32 index)
+        {
+            throw new NotImplementedException();
+        }
+        internal static object GetVirtualModel()
+        {
+            throw new NotImplementedException();
+        }
+        internal object pLocalttachment(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        internal static char pszLocalNodeName(Int32 iNode)
+        {
+            throw new NotImplementedException();
+        }
+        internal static mstudioseqdesc_t pLocalSeqdesc(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        internal static mstudioattachment_t _pLocalAttachment_(Int32 i)
+        {
+            return _pLocalAttachment_(i);
+        }
+        internal mstudioattachment_t PLocalAttachment(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        internal static mstudioattachment_t pLocalAttachment3(Int32 index)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    studiohdr_t studiohdr_T = new();
+    unsafe void SetEventListVersion(Int32 version, object m_pVModel, virtualmodel_t virtualmodel_T)
+    {
+        studiohdr_T.eventsindexed = version;
+        if (m_pVModel == null)
+        {
+            return;
+        }
+        Int32 i;
+        for (i = 1; i < virtualmodel_T.m_group.Count; i++)
+        {
+            studiohdr_t pStudioHdr = GroupStudioHdr(i);
+            Debug.LogAssertion(pStudioHdr);
+            pStudioHdr.eventsindexed = version;
+        }
+    }
+    unsafe Int32 GetNumIKAutoplayLocks()
+    {
+        virtualmodel_t virtualmodel_T = new();
+        if (virtualmodel_T.GetType() == null)
+        {
+            return studiohdr_T.numlocalikautoplaylocks;
+        }
+        return virtualmodel_T.m_iklock.Count;
+    }
+    unsafe mstudioiklock_t pIKAutoplayLock_(Int32 i)
+    {
+        if (pVModel.GetType() == type)
+        {
+            return (mstudioiklock_t)studiohdr_T.pLocalIKAutoplayLock(i);
+        }
+        studiohdr_t pStudioHdr = GroupStudioHdr(pVModel.m_iklock[i].group);
+        Debug.LogAssertionFormat("pStudioHdr");
+        return (mstudioiklock_t)pStudioHdr.pLocalIKAutoplayLock(pVModel.m_iklock[i].index);
+    }
+    Int32 CountAutoplaySequences_()
+    {
+        Int32 count = 0;
+        for (Int32 i = 0; i < GetNumSeq(); i++)
+        {
+            mstudioseqdesc_t seqdesc = pSeqdesc(i);
+            Int32 STUDIO_AUTOPLAY = 0;
+            if (seqdesc.flags == STUDIO_AUTOPLAY)
+            {
+                count++;
+            }
+            return count;
+        }
+        return CountAutoplaySequences();
+        unsafe Int32 CopyAutoplaySequences(short* pOut, Int32 outCount, object seqdesc)
+        {
+            Int32 outIndex = 0;
+            for (Int32 i = 0; i < GetNumSeq() && outIndex < outCount; i++)
+            {
+                Int32 STUDIO_AUTOPLAY = 0;
+                if (pSeqdesc(i).flags == STUDIO_AUTOPLAY)
+                {
+                    pOut[outIndex] = (short)i;
+                    outIndex++;
+                }
+            }
+            return outIndex;
+        }
+        #endregion
+        Int32 RemapSeqBone(Int32 iSequence, Int32 iLocalBone)
+        {
+            if (pVModel.GetType() != null)
+            {
+                virtualgroup_t pSeqGroup = pVModel.pSeqGroup(iSequence);
+                return pSeqGroup.masterNode[iLocalBone];
+            }
+            return iLocalBone;
+        }
+        Int32 RemapAnimBone(Int32 iAnim, Int32 iLocalBone)
+        {
+            return RemapAnimBone(iAnim, iLocalBone);
+        }
+        mstudioseqdesc_t pSeqdesc(Int32 i)
+        {
+            throw new NotImplementedException();
+        }
+        Int32 GetNumSeq()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    private Int32 CountAutoplaySequences()
+    {
+        throw new NotImplementedException();
+    }
+    virtualmodel_t pVModel = new();
+    Int32 iLocalBone = 0;
+    struct m_pVModel_
+    {
+    }
+
+    public class flex_maxrule
+    {
+
+       public static char GetString()
+        {
+            return GetString();
+
+        }
+    }
+    public object[] MDLCACHE_STUDIOHDR { get; private set; }
+    public Type type { get; private set; }
+    internal class iAnim
+    {
+        class prule
+        {
+            public static float flex;
+        }
+        unsafe void RunFlexRules(float* src, float* dest, object pBlink, float[] stack, float d)
+        {
+            Int32 i, j;
+            for (i = 0; i < numflexdesc(); i++)
+            {
+                dest[i] = 0;
+            }
+            for (i = 0; i < numflexrules(); i++)
+            {
+                Int32 k = 0;
+                mstudioflexrule_t* prule = pFlexRule(i);
+                mstudioflexop_t* pops = prule->iFlexOp(0);
+                Int32 nFlexRulesToRun = 0;                              // 0 means run them all
+               char pszExpression = flex_maxrule.GetString();
+                if (pszExpression.GetType() != null)
+                {
+                    nFlexRulesToRun = atoi(pszExpression);              // 0 will be returned if not a numeric string
+                }
+                float flEyeUpDown = 0.0f;
+                float flBlink = 0.0f;
+                mstudioflexcontroller_t pCloseLidV = pFlexcontroller((LocalFlexController_t)(Int32)pops->d);
+                float flCloseLidV = RemapValClamped(src[pCloseLidV.localToGlobal], pCloseLidV.min, pCloseLidV.max, 0.0f, 1.0f);
+                mstudioflexcontroller_t pCloseLid = pFlexcontroller(static_cast<LocalFlexController_t>((Int32)stack[k - 1]));
+                float flCloseLid = RemapValClamped(src[pCloseLid.localToGlobal], pCloseLid.min, pCloseLid.max, 0.0f, 1.0f);
+                Int32 nBlinkIndex = static_cast<Int32>((Int32)stack[k - 2]);
+                Int32 nEyeUpDownIndex = (Int32)stack[k - 3];
+                for (j = 0; j < prule->numops; j++)
+                {
+                    const Int32 STUDIO_ADD = 1;
+                    const Int32 STUDIO_SUB = 2;
+                    const Int32 STUDIO_MUL = 3;
+                    const Int32 STUDIO_DIV = 4;
+                    const Int32 STUDIO_NEG = 5;
+                    const Int32 STUDIO_MAX = 6;
+                    const Int32 STUDIO_MIN = 7;
+                    const Int32 STUDIO_CONST = 8;
+                    const Int32 STUDIO_FETCH1 = 9;
+                    const Int32 STUDIO_FETCH2 = 10;
+                    const Int32 STUDIO_COMBO = 11;
+                    const Int32 STUDIO_DOMINATE = 12;
+                    const Int32 STUDIO_2WAY_0 = 13;
+                    const Int32 STUDIO_2WAY_1 = 14;
+                    const Int32 STUDIO_NWAY = 15;
+                    const Int32 STUDIO_DME_LOWER_EYELID = 16;
+                    const Int32 STUDIO_DME_UPPER_EYELID = 17;
+                    switch (pops->op)
+                    {
+                        case STUDIO_ADD:
+                            stack[k - 2] = stack[k - 2] + stack[k - 1];
+                            k--;
+                            break;
+                        case STUDIO_SUB:
+                            stack[k - 2] = stack[k - 2] - stack[k - 1];
+                            k--;
+                            break;
+                        case STUDIO_MUL:
+                            stack[k - 2] = stack[k - 2] * stack[k - 1];
+                            k--;
+                            break;
+                        case STUDIO_DIV:
+                            if (stack[k - 1] > 0.0001f)
+                            {
+                                stack[k - 2] = stack[k - 2] / stack[k - 1];
+                            }
+                            else
+                            {
+                                stack[k - 2] = 0;
+                            }
+                            k--;
+                            break;
+                        case STUDIO_NEG:
+                            stack[k - 1] = -stack[k - 1];
+                            break;
+                        case STUDIO_MAX:
+                            stack[k - 2] = Mathf.Max(stack[k - 2], stack[k - 1]);
+                            k--;
+                            break;
+                        case STUDIO_MIN:
+                            stack[k - 2] = Mathf.Min(stack[k - 2], stack[k - 1]);
+                            k--;
+                            break;
+                        case STUDIO_CONST:
+                            stack[k] = (float)d;
+                            k++;
+                            break;
+                        case STUDIO_FETCH1:
+                            {
+                                Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops->d).localToGlobal;
+                                stack[k] = src[m];
+                                k++;
+                                break;
+                            }
+                        case STUDIO_FETCH2:
+                            {
+                                stack[k] = dest[(Int32)pops->d];
+                                k++;
+                                break;
+                            }
+                        case STUDIO_COMBO:
+                            {
+                                Int32 m = (Int32)pops->d;
+                                Int32 km = k - m;
+                                for (Int32 l = km + 1; l < k; ++l)
+                                {
+                                    stack[km] *= stack[l];
+                                }
+                                k = k - m + 1;
+                                break;
+                            }
+                        case STUDIO_DOMINATE:
+                            {
+                                Int32 m = (Int32)pops->d;
+                                Int32 km = k - m;
+                                float dv = stack[km];
+                                for (Int32 l = km + 1; l < k; ++l)
+                                {
+                                    dv *= stack[l];
+                                }
+                                stack[km - 1] *= 1.0f - dv;
+                                k -= m;
+                                break;
+                            }
+                        case STUDIO_2WAY_0:
+                            {
+                                Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops->d).localToGlobal;
+                                stack[k] = RemapValClamped(src[m], -1.0f, 0.0f, 1.0f, 0.0f);
+                                k++;
+                                break;
+                            }
+                        case STUDIO_2WAY_1:
+                            {
+                                Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops->d).localToGlobal;
+                                stack[k] = RemapValClamped(src[m], 0.0f, 1.0f, 0.0f, 1.0f);
+                                k++;
+                                break;
+                            }
+                        case STUDIO_NWAY:
+                            {
+                                LocalFlexController_t valueControllerIndex = (LocalFlexController_t)(Int32)stack[k - 1];
+                                Int32 m = pFlexcontroller(valueControllerIndex).localToGlobal;
+                                float flValue = src[m];
+                                Int32 v = pFlexcontroller((LocalFlexController_t)(Int32)pops->d).localToGlobal;
+                                Vector4 filterRamp = new Vector4(stack[k - 5], stack[k - 4], stack[k - 3], stack[k - 2]);
+                                if (flValue <= filterRamp.x || flValue >= filterRamp.w)
+                                {
+                                    flValue = 0.0f;
+                                }
+                                else if (flValue < filterRamp.y)
+                                {
+                                    flValue = RemapValClamped(flValue, filterRamp.x, filterRamp.y, 0.0f, 1.0f);
+                                }
+                                else if (flValue > filterRamp.z)
+                                {
+                                    flValue = RemapValClamped(flValue, filterRamp.z, filterRamp.w, 1.0f, 0.0f);
+                                }
+                                else
+                                {
+                                    flValue = 1.0f;
+                                }
+                                stack[k - 5] = flValue * src[v];
+                                k -= 4;
+                                break;
+                            }
+                        case STUDIO_DME_LOWER_EYELID:
+                            {
+                                if (nBlinkIndex >= 0)
+                                {
+                                    flBlink = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)nBlinkIndex).localToGlobal], pFlexcontroller((LocalFlexController_t)nBlinkIndex).min, pFlexcontroller((LocalFlexController_t)nBlinkIndex).max, 0.0f, 1.0f);
+                                }
+                                if (nEyeUpDownIndex >= 0)
+                                {
+                                    mstudioflexcontroller_t pEyeUpDown = pFlexcontroller((LocalFlexController_t)nEyeUpDownIndex);
+                                    flEyeUpDown = RemapValClamped(src[pEyeUpDown.localToGlobal], pEyeUpDown.min, pEyeUpDown.max, -1.0f, 1.0f);
+                                }
+                                if (flEyeUpDown > 0.0f)
+                                {
+                                    stack[k - 3] = (1.0f - flEyeUpDown) * (1.0f - flCloseLidV) * flCloseLid;
+                                }
+                                else
+                                {
+                                    stack[k - 3] = (1.0f - flCloseLidV) * flCloseLid;
+                                }
+                                k -= 2;
+                                break;
+                            }
+                        case STUDIO_DME_UPPER_EYELID:
+                            {
+                                if ((Int32)stack[k - 2] >= 0)
+                                {
+                                    flBlink = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).localToGlobal], pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).min, pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).max, 0.0f, 1.0f);
+                                }
+                                if (nEyeUpDownIndex >= 0)
+                                {
+                                    mstudioflexcontroller_t pEyeUpDown = pFlexcontroller((LocalFlexController_t)nEyeUpDownIndex);
+                                    flEyeUpDown = RemapValClamped(src[pEyeUpDown.localToGlobal], pEyeUpDown.min, pEyeUpDown.max, -1.0f, 1.0f);
+                                }
+                                if (flEyeUpDown < 0.0f)
+                                {
+                                    stack[k - 3] = (1.0f + flEyeUpDown) * (float)RemapValClamped(src[pFlexcontroller((LocalFlexController_t)pops->d).localToGlobal], pFlexcontroller((LocalFlexController_t)pops->d).min, pFlexcontroller((LocalFlexController_t)pops->d).max, 0.0f, 1.0f) * (float)RemapValClamped(src[pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).localToGlobal], pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).min, pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).max, 0.0f, 1.0f);
+                                }
+                                else
+                                {
+                                    stack[k - 3] = (float)RemapValClamped(src[pFlexcontroller((LocalFlexController_t)pops->d).localToGlobal], pFlexcontroller((LocalFlexController_t)pops->d).min, pFlexcontroller((LocalFlexController_t)pops->d).max, 0.0f, 1.0f) * (float)RemapValClamped(src[pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).localToGlobal], pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).min, pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).max, 0.0f, 1.0f);
+                                }
+                                k -= 2;
+                                break;
+                            }
+                            if (nBlinkIndex >= 0)
+                            {
+                                flBlink = RemapValClamped(src[pFlexcontroller(static_cast<LocalFlexController_t>((Int32)stack[k - 2])).localToGlobal], pFlexcontroller(static_cast<LocalFlexController_t>((Int32)stack[k - 2])).min, pFlexcontroller(static_cast<LocalFlexController_t>((Int32)stack[k - 2])).max, 0.0f, 1.0f);
+                            }
+                            if (nEyeUpDownIndex >= 0)
+                            {
+                                mstudioflexcontroller_t pEyeUpDown = pFlexcontroller(static_cast<LocalFlexController_t>((Int32)stack[k - 3]));
+                                flEyeUpDown = RemapValClamped(src[pEyeUpDown.localToGlobal], pEyeUpDown.min, pEyeUpDown.max, -1.0f, 1.0f);
+                            }
+                            if (flEyeUpDown < 0.0f)
+                            {
+                                stack[k - 3] = (1.0f + flEyeUpDown) * flCloseLidV * flCloseLid;
+                            }
+                            else
+                            {
+                                stack[k - 3] = flCloseLidV * flCloseLid;
+                            }
+                            k -= 2;
+                    }
+                    break;
+                }
+                pops++;
+            }
+            dest[(Int32)prule.flex] = stack[0]; unsafe mstudioflexrule_t* pFlexRule(Int32 i)
+            {
+                throw new NotImplementedException();
+            }
+            Int32 numflexrules()
+            {
+                throw new NotImplementedException();
+            }
+            Int32 numflexdesc()
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        private int atoi(char pszExpression)
+        {
+            throw new NotImplementedException();
+        }
+
+        private unsafe int atoi(char* pszExpression)
+        {
+            throw new NotImplementedException();
+        }
+
+        private float[] stack = new float[100]; // Example size, adjust as needed
+        private float[] src = new float[100]; // Example source data array
+        private float[] dest = new float[100]; // Example destination data array
+        private Int32 nBlinkIndex = -1;
+        private Int32 nEyeUpDownIndex = -1;
+        private float flBlink = 0.0f;
+        private float flEyeUpDown = 0.0f;
+        private float flCloseLid = 1.0f;
+        private float flCloseLidV = 1.0f;
+        public struct mstudioflexcontroller_t
+        {
+            public Int32 localToGlobal;
+            public float min;
+            public float max;
+        }
+        public enum LocalFlexController_t { }
+        private mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t index)
+        {
+            return new mstudioflexcontroller_t { localToGlobal = (Int32)index, min = 0.0f, max = 1.0f };
+        }
+        private float RemapValClamped(float val, float A, float B, float C, float D)
+        {
+            if (A == B)
+                return val >= B ? D : C; // Prevent division by zero
+            float cVal = Mathf.Clamp01((val - A) / (B - A));
+            return C + (D - C) * cVal;
+        }
+        Int32 pops;
+        public void ProcessFlexRules()
+        {
+            Int32 j, k = 0; // Assuming k is initialized somewhere appropriately
+            Int32 d = 0; // Placeholder variable, adjust as necessary based on context
+            Int32 prule = new();
+            for (j = 0; j < prule; j++)
+            {
+                switch (pops)
+                {
+                    case 1: // STUDIO_ADD
+                        stack[k - 2] = stack[k - 2] + stack[k - 1];
+                        k--;
+                        break;
+                    case 2: // STUDIO_SUB
+                        stack[k - 2] = stack[k - 2] - stack[k - 1];
+                        k--;
+                        break;
+                    case 3: // STUDIO_MUL
+                        stack[k - 2] = stack[k - 2] * stack[k - 1];
+                        k--;
+                        break;
+                    case 4: // STUDIO_DIV
+                        stack[k - 2] = stack[k - 1] > 0.0001f ? stack[k - 2] / stack[k - 1] : 0;
+                        k--;
+                        break;
+                    case 5: // STUDIO_NEG
+                        stack[k - 1] = -stack[k - 1];
+                        break;
+                    case 6: // STUDIO_MAX
+                        stack[k - 2] = Mathf.Max(stack[k - 2], stack[k - 1]);
+                        k--;
+                        break;
+                    case 7: // STUDIO_MIN
+                        stack[k - 2] = Mathf.Min(stack[k - 2], stack[k - 1]);
+                        k--;
+                        break;
+                    case 8: // STUDIO_CONST
+                        stack[k] = (float)d;
+                        k++;
+                        break;
+                    case 9: // STUDIO_FETCH1
+                        {
+                            Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops).localToGlobal;
+                            stack[k] = src[m];
+                            k++;
+                            break;
+                        }
+                    case 10: // STUDIO_FETCH2
+                        {
+                            stack[k] = dest[(Int32)pops];
+                            k++;
+                            break;
+                        }
+                    case 11: // STUDIO_COMBO
+                        {
+                            Int32 m = (Int32)pops;
+                            Int32 km = k - m;
+                            for (Int32 l = km + 1; l < k; ++l)
+                            {
+                                stack[km] *= stack[l];
+                            }
+                            k = k - m + 1;
+                            break;
+                        }
+                    case 12: // STUDIO_DOMINATE
+                        {
+                            Int32 m = (Int32)pops;
+                            Int32 km = k - m;
+                            float dv = stack[km];
+                            for (Int32 l = km + 1; l < k; ++l)
+                            {
+                                dv *= stack[l];
+                            }
+                            stack[km - 1] *= 1.0f - dv;
+                            k -= m;
+                            break;
+                        }
+                    case 13: // STUDIO_2WAY_0
+                        {
+                            Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops).localToGlobal;
+                            stack[k] = RemapValClamped(src[m], -1.0f, 0.0f, 1.0f, 0.0f);
+                            k++;
+                            break;
+                        }
+                    case 14: // STUDIO_2WAY_1
+                        {
+                            Int32 m = pFlexcontroller((LocalFlexController_t)(Int32)pops).localToGlobal;
+                            stack[k] = RemapValClamped(src[m], 0.0f, 1.0f, 0.0f, 1.0f);
+                            k++;
+                            break;
+                        }
+                    case 15: // STUDIO_NWAY
+                        {
+                            LocalFlexController_t valueControllerIndex = (LocalFlexController_t)(Int32)stack[k - 1];
+                            Int32 m = pFlexcontroller(valueControllerIndex).localToGlobal;
+                            float flValue = src[m];
+                            Int32 v = pFlexcontroller((LocalFlexController_t)(Int32)pops).localToGlobal;
+                            Vector4 filterRamp = new Vector4(stack[k - 5], stack[k - 4], stack[k - 3], stack[k - 2]);
+                            flValue = flValue <= filterRamp.x || flValue >= filterRamp.w ? 0.0f :
+                            flValue < filterRamp.y ? RemapValClamped(flValue, filterRamp.x, filterRamp.y, 0.0f, 1.0f) :
+                            flValue > filterRamp.z ? RemapValClamped(flValue, filterRamp.z, filterRamp.w, 1.0f, 0.0f) : 1.0f;
+                            stack[k - 5] = flValue * src[v];
+                            k -= 4;
+                            break;
+                        }
+                    case 16: // STUDIO_DME_LOWER_EYELID
+                        {
+                            if (nBlinkIndex >= 0)
+                            {
+                                flBlink = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)nBlinkIndex).localToGlobal],
+                                pFlexcontroller((LocalFlexController_t)nBlinkIndex).min,
+                                pFlexcontroller((LocalFlexController_t)nBlinkIndex).max, 0.0f, 1.0f);
+                            }
+                            if (nEyeUpDownIndex >= 0)
+                            {
+                                mstudioflexcontroller_t pEyeUpDown = pFlexcontroller((LocalFlexController_t)nEyeUpDownIndex);
+                                flEyeUpDown = RemapValClamped(src[pEyeUpDown.localToGlobal], pEyeUpDown.min, pEyeUpDown.max, -1.0f, 1.0f);
+                            }
+                            stack[k - 3] = flEyeUpDown > 0.0f ? (1.0f - flEyeUpDown) * (1.0f - flCloseLidV) * flCloseLid : (1.0f - flCloseLidV) * flCloseLid;
+                            k -= 2;
+                            break;
+                        }
+                    case 17: // STUDIO_DME_UPPER_EYELID
+                        {
+                            if ((Int32)stack[k - 2] >= 0)
+                            {
+                                flBlink = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).localToGlobal],
+                                pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).min,
+                                pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 2]).max, 0.0f, 1.0f);
+                            }
+                            if (nEyeUpDownIndex >= 0)
+                            {
+                                mstudioflexcontroller_t pEyeUpDown = pFlexcontroller((LocalFlexController_t)nEyeUpDownIndex);
+                                flEyeUpDown = RemapValClamped(src[pEyeUpDown.localToGlobal], pEyeUpDown.min, pEyeUpDown.max, -1.0f, 1.0f);
+                            }
+                            float upperLidValue = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)pops).localToGlobal],
+                            pFlexcontroller((LocalFlexController_t)pops).min,
+                            pFlexcontroller((LocalFlexController_t)pops).max, 0.0f, 1.0f);
+                            float additionalLidValue = RemapValClamped(src[pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).localToGlobal],
+                            pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).min,
+                            pFlexcontroller((LocalFlexController_t)(Int32)stack[k - 1]).max, 0.0f, 1.0f);
+                            stack[k - 3] = flEyeUpDown < 0.0f ? (1.0f + flEyeUpDown) * upperLidValue * additionalLidValue : upperLidValue * additionalLidValue;
+                            k -= 2;
+                            break;
+                        }
+                        if (nFlexRulesToRun == 0)                   // 0 means run all rules correctly
+                        {
+                            dest[prule] = stack[0];
+                        }
+                        else // run only up to nFlexRulesToRun correctly...zero out the rest
+                        {
+                            if (j < nFlexRulesToRun)
+                                dest[prule] = stack[0];
+                            else
+                                dest[prule] = 0.0f;
+                        }
+                        dest[prule] = 1.0f;
+                }
+                Int32 numflexrules()
+                {
+                    throw new NotImplementedException();
+                }
+                unsafe mstudioflexrule_t* pFlexRule(Int32 i)
+                {
+                    throw new NotImplementedException();
+                }
+                Int32 numflexdesc()
+                {
+                    throw new NotImplementedException();
+                }
+                unsafe void SetActivityForSequence(CStudioHdr pstudiohdr, Int32 i)
+                {
+                }
+                unsafe void Initialize(CStudioHdr pstudiohdr, object m_pSequenceTuples)
+                {
+                    AssertMsg1(m_pSequenceTuples == null, "Tried to double-initialize sequence mapping for %s", pstudiohdr.pszName());
+                    if (m_pSequenceTuples != null)
+                        return; // don't double initialize.
+                    SetValidationPair(pstudiohdr);
+                    if (!pstudiohdr.SequencesAvailable())
+                        return; // nothing to do.
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+                    bool m_bIsInitialized = true;
+#endif
+                    bool bFoundOne = false;
+                    mstudioseqdesc_t seqdesc1 = new();
+                    Int32 NumSeq = pstudiohdr.GetNumSeq();
+                    for (Int32 i = 0; i < NumSeq; ++i)
+                    {
+                        mstudioseqdesc_t seqdesc = pstudiohdr.pSeqdesc(i);
+#if definedSERVER_DLL || definedCLIENT_DLL || definedGAME_DLL
+if (!(seqdesc.flags & STUDIO_ACTIVITY))
+{
+SetActivityForSequence( pstudiohdr, i );
+}
+#endif
+                        if (seqdesc.actweight >= 0)
+                        {
+                            bFoundOne = true;
+                        }
+                        {
+                        }
+                        object arg2 = null;
+                        ForActivity activity = null;
+                        HashValueType hashValueType = entry(activity, arg2);
+                        iabs(seqdesc.actweight);
+                        Func<ForActivity> forActivity1 = null;
+                        ;
+                        UtlHashHandle_t handle = m_ActToSeqHash.Find(activity, forActivity1, "obj ", hashValueType);
+                        if (m_ActToSeqHash.IsValidHandle(handle))
+                        {
+                            HashValueType toUpdate = (HashValueType)m_ActToSeqHash.Element(handle);
+                            toUpdate.count += 1;
+                        }
+                    }
+                    void AssertMsg1(bool v1, string v2, object value)
+                    {
+                        throw new NotImplementedException();
+                    }
+                    void SetValidationPair(CStudioHdr pstudiohdr)
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+            }
+        }
+        private HashValueType entry(ForActivity activity, object arg2)
+        {
+            throw new NotImplementedException();
+        }
+        internal class UtlHashHandle_t
+        {
+        }
+        ActToSeqHash m_ActToSeqHash = new ActToSeqHash();
+
+        public int nFlexRulesToRun { get; private set; }
+
+        void Start()
+        {
+            SeqDesc.ActWeight = 10; // Example value
+            ToUpdate.TotalWeight = 0; // Initialize total weight
+            ToUpdate.TotalWeight += Mathf.Abs(SeqDesc.ActWeight);
+            Debug.Assert(ToUpdate.TotalWeight > 0, "Total weight should be greater than zero");
+            HashValueType entry = new HashValueType
+            {
+                StartingIdx = ToUpdate.TotalWeight,
+                ActivityIdx = SeqDesc.ActWeight
+            };
+            m_ActToSeqHash.Insert(entry);
+            Debug.Log("Entry inserted successfully");
+        }
+    }
+    public struct SeqDesc
+    {
+        public static Int32 ActWeight;
+    }
+    public struct ToUpdate
+    {
+        public static Int32 TotalWeight;
+    }
+    public class ActToSeqHash
+    {
+        private List<HashValueType> _entries = new List<HashValueType>();
+        public void Insert(HashValueType entry)
+        {
+            _entries.Add(entry);
+            Debug.Log("Entry added to hash");
+        }
+        internal HashValueType Element(UtlHashHandle_t handle)
+        {
+            throw new NotImplementedException();
+        }
+        internal UtlHashHandle_t Find(ForActivity activity, Func<ForActivity> forActivity1, string v, HashValueType hashValueType)
+        {
+            throw new NotImplementedException();
+        }
+        internal bool IsValidHandle(UtlHashHandle_t handle)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    public struct HashValueType
+    {
+        public Int32 StartingIdx;
+        public Int32 ActivityIdx;
+        public Int32 count { get; internal set; }
+    }
+    static Int32 iabs(object actweight)
+    {
+        throw new NotImplementedException();
+    }
+    float max(float v1, float v2)
+    {
+        throw new NotImplementedException();
+    }
+    float RemapValClamped(float v1, object min, object max, float v2, float v3)
+    {
+        throw new NotImplementedException();
+    }
+    static T static_cast<T>(Int32 v)
+    {
+        throw new NotImplementedException();
+    }
+    bool bFoundOne = new();
+    Int32 sequenceCount = 0;
+}
+public struct SeqDesc
+{
+    public static Int32 ActWeight;
+}
+public struct ToUpdate
+{
+    public static Int32 TotalWeight;
+}
+public class SequenceManager : MonoBehaviour
+{
+    private ActToSeqHash m_ActToSeqHash = new ActToSeqHash();
+    void Start()
+    {
+        SeqDesc.ActWeight = 10; // Example value
+        ToUpdate.TotalWeight = 0; // Initialize
+        UpdateTotalWeight();
+        Debug.Assert(ToUpdate.TotalWeight > 0, "Total weight should be greater than zero");
+        InsertEntry();
+    }
+    void UpdateTotalWeight()
+    {
+        ToUpdate.TotalWeight += Mathf.Abs(SeqDesc.ActWeight);
+    }
+    void InsertEntry()
+    {
+        HashValueType entry = new HashValueType
+        {
+            StartingIdx = ToUpdate.TotalWeight,
+            ActivityIdx = SeqDesc.ActWeight
+        };
+        m_ActToSeqHash.Insert(entry);
+        Debug.Log("Entry inserted successfully");
+    }
+}
+public class ActToSeqHash
+{
+    private List<HashValueType> _entries = new List<HashValueType>();
+    public void Insert(HashValueType entry)
+    {
+        _entries.Add(entry);
+        Debug.Log("Entry added to hash");
+    }
+}
+public struct HashValueType
+{
+    public Int32 StartingIdx;
+    public Int32 ActivityIdx;
+    Int32 activityIdx;
+    Int32 Max(topActivity topActivity, Int32 activityIdx)
+    {
+        return Max(topActivity, activityIdx);
+    }
+}
+internal class topActivity
+{
+}
+public class SequenceTuple
+{
+}
+public class AllocationExample
+{
+    public Int32 allocsize;
+    private Int32 topActivity = 10; // Example value, replace with your actual value
+    public AllocationExample()
+    {
+        allocsize = (topActivity + 1) * sizeof(Int32);
+    }
+    public class HashValueType
+    {
+        public Int32 startingIdx;
+        public Int32 count;
+        public Int32 activityIdx;
+        public Int32 totalWeight;
+    }
+    Int32 ALIGN_VALUE(Int32 allocsize, Int32 v)
+    {
+        throw new NotImplementedException();
+    }
+    Int32 seqsPerAct = static_cast<Int32>(0);
+    private static T static_cast<T>(T v)
+    {
+        throw new NotImplementedException();
+    }
+    void memset(Int32 seqsPerAct, Int32 v, Int32 allocsize)
+    {
+        return;
+    }
+    public class SequenceMapping
+    {
+        private Int32 topActivity = 10; // Example value; replace with actual logic
+        private Int32[] seqsPerAct = new Int32[100]; // Example array, set size accordingly
+        private Int32 m_iSequenceTuplesCount = 0;
+        private Int32 m_iSequenceTuplesCount_;
+        private Int32[] sequenceTuples;
+        private Dictionary<Int32, HashValueType> m_ActToSeqHash_ = new Dictionary<Int32, HashValueType>(); // Example of hash mapping
+        private CStudioHdr pStudioHdr = new CStudioHdr(); // Assuming this is properly initialized elsewhere
+        public void ProcessSequences()
+        {
+            Int32 NumSeq = 10; // Example, replace with the correct initialization
+            Int32 sequenceCount = 0;
+            for (Int32 i_ = 0; i_ < NumSeq; ++i_)
+            {
+                mstudioseqdesc_t seqdesc = pStudioHdr.pSeqdesc(i_);
+                if (seqdesc.activity >= 0)
+                {
+                    HashValueType hashValueType_ = new HashValueType();
+                    ForActivity forActivity = new ForActivity();
+                    HashValueType handle = m_ActToSeqHash_.ContainsKey(seqdesc.activity)
+                    ? m_ActToSeqHash_[seqdesc.activity]
+                    : null;
+                    if (handle != null)
+                    {
+                        Int32 tupleOffset = seqsPerAct[seqdesc.activity];
+                        Debug.Assert(tupleOffset < handle.totalWeight);
+                        seqsPerAct[seqdesc.activity] += Math.Abs(seqdesc.actweight);
+                        if (seqsPerAct[seqdesc.activity] == 0)
+                        {
+                            seqsPerAct[seqdesc.activity] = 1;
+                        }
+                    }
+                    else
+                    {
+                        m_ActToSeqHash_[seqdesc.activity] = new HashValueType
+                        {
+                            startingIdx = sequenceCount,
+                            count = 1,
+                            totalWeight = Math.Abs(seqdesc.actweight)
+                        };
+                    }
+                }
+            }
+            Int32 chkSequenceCount = 0;
+            for (Int32 j = 0; j <= topActivity; ++j)
+            {
+                chkSequenceCount += seqsPerAct[j];
+            }
+            Debug.Assert(chkSequenceCount == m_iSequenceTuplesCount_);
+        }
+        private Int32 iabs(Int32 value)
+        {
+            return Math.Abs(value);
+        }
+        private Int32 GetHash(Int32 activity, Int32 v1, Int32 v2, Int32 v3)
+        {
+            return activity.GetHashCode();
+        }
+        public class HashValueType
+        {
+            public Int32 startingIdx;
+            public Int32 count;
+            public Int32 activityIdx;
+            public Int32 totalWeight;
+        }
+        public class CStudioHdr
+        {
+            public mstudioseqdesc_t pSeqdesc(Int32 i)
+            {
+                return new mstudioseqdesc_t();
+            }
+            internal Int32 GetRenderHdr()
+            {
+                throw new NotImplementedException();
+            }
+            internal object GetVirtualModel()
+            {
+                throw new NotImplementedException();
+            }
+        }
+        public class ForActivity
+        {
+        }
+        public void Initialize(CStudioHdr pstudio, Int32[] sequenceTuples)
+        {
+            m_ActToSeqHash.Clear();
+            this.sequenceTuples = sequenceTuples;
+        }
+        public Int32 NumSequencesForActivity(Int32 forActivity, Func<ForActivity> func)
+        {
+            if (sequenceTuples == null) return 0;
+            if (m_ActToSeqHash.ContainsKey(forActivity))
+            {
+                return m_ActToSeqHash_[forActivity].count;
+            }
+            return 0;
+        }
+        public void Reinitialize(CStudioHdr pstudio)
+        {
+            m_ActToSeqHash.Clear();
+            Initialize(pstudio, sequenceTuples);
+        }
+        internal struct m_ActToSeqHash
+        {
+            public Int32 startingidx;
+            public Int32 count;
+            internal static object Element(UtlHashHandle_t handle)
+            {
+                throw new NotImplementedException();
+            }
+            internal static UtlHashHandle_t Find_(ForActivity forActivity, ForActivity forActivity1, Func<ForActivity, object, HashValueType> entry)
+            {
+                throw new NotImplementedException();
+            }
+            internal static UtlHashHandle_t Find(ForActivity forActivity, Func<ForActivity> forActivity1, object finding, HashValueType hashValueType_)
+            {
+                throw new NotImplementedException();
+            }
+            internal static UtlHashHandle_t GetFirstHandle()
+            {
+                throw new NotImplementedException();
+            }
+            internal static HashValueType GetHashValueType(HashValueType element)
+            {
+                throw new NotImplementedException();
+            }
+            internal static UtlHashHandle_t GetNextHandle(UtlHashHandle_t handle)
+            {
+                throw new NotImplementedException();
+            }
+            internal static void Insert(Func<ForActivity, object, HashValueType> entry)
+            {
+                throw new NotImplementedException();
+            }
+            internal static bool IsValidHandle(UtlHashHandle_t handle)
+            {
+                throw new NotImplementedException();
+            }
+            internal static void RemoveAll()
+            {
+                throw new NotImplementedException();
+            }
+            internal static bool ContainsKey(Int32 activity)
+            {
+                throw new NotImplementedException();
+            }
+            internal static void Clear()
+            {
+                throw new NotImplementedException();
+            }
+        }
+        unsafe bool ValidateAgainst(CStudioHdr pstudiohdr, object m_expectedVModel, studiohdr_t m_expectedPStudioHdr)
+        {
+            bool m_bIsInitialized = false;
+            if (m_bIsInitialized)
+            {
+                return m_expectedPStudioHdr.activitylistversion == pstudiohdr.GetRenderHdr() &&
+                m_expectedVModel == pstudiohdr.GetVirtualModel();
+            }
+            else
+            {
+                return true; // Allow an ordinary initialization to take place without printing a panicky assert.
+            }
+            void SetValidationPair(CStudioHdr pstudiohdr, studiohdr_t m_expectedPStudioHdr, studiohdr_t m_expectedVModel)
+            {
+                m_expectedPStudioHdr.animblockModel = pstudiohdr.GetRenderHdr();
+                m_expectedVModel = (studiohdr_t)pstudiohdr.GetVirtualModel();
+            }
+        }
+        public unsafe struct mstudioiklock_t
+        {
+            Int32 chain;
+            float flPosWeight;
+            float flLocalQWeight;
+            fixed Int32 unused[4];
+            Int32 m_nFrameUnlockCounter;
+            Int32 m_pFrameUnlockCounter;
+            CThreadFastMutex m_FrameUnlockCounterMutex;
+            Vector3 m_boneFlags;
+            Vector3 m_boneParent;
+            private Int32 numbonecontrollers;
+            private Int32 bonecontrollerindex;
+        }
+        unsafe mstudioflexcontroller_t pFlexcontroller(LocalFlexController_t i)
+        {
+            pFlexcontroller(i);
+            return pFlexcontroller(i);
+        }
+        unsafe Int32 numbones()
+        {
+            numbones();
+            {
+                studiohdr_t m_PStudioHdr = new();
+                studiohdr_t studiohdr_T = new();
+                studiohdr_t studiohdr_T1 = new();
+                return (Int32)studiohdr_T.numAllowedRootLods;
+#pragma warning disable CS8500
+                unsafe mstudiobone_t pBone(Int32 i)
+                {
+                    pBone(i);
+                    return pBone(i);
+                }
+#pragma warning restore CS8500
+                Int32 RemapAnimBone(Int32 iAnim, Int32 iLocalBone)
+                {
+                    return RemapSeqBone(iAnim, iLocalBone);
+                }
+                Int32 RemapSeqBone(Int32 iSequence, Int32 iLocalBone)
+                {
+                    return RemapSeqBone(iSequence, iLocalBone);
+                }
+                bool SequencesAvailable()
+                {
+                    return true;
+                }
+                Int32 GetNumSeq()
+                {
+                    return new Int32();
+                }
+                mstudioanimdesc_t pAnimdesc(Int32 i)
+                {
+                    return pAnimdesc(i);
+                }
+                mstudioseqdesc_t pSeqdesc(Int32 iSequence)
+                {
+                    return pSeqdesc(iSequence);
+                }
+                Int32 iRelativeAnim(Int32 baseseq, Int32 relanim)
+                {
+                    return iRelativeAnim(baseseq, relanim);
+                }
+                Int32 iRelativeSeq(Int32 baseseq, Int32 relseq)
+                {
+                    return iRelativeSeq(baseseq, relseq);
+                }
+                Int32 GetSequenceActivity(Int32 iSequence)
+                {
+                    return GetSequenceActivity(iSequence);
+                    void SetSequenceActivity(Int32 iSequence, Int32 iActivity)
+                    {
+                    }
+                    Int32 GetActivityListVersion()
+                    {
+                        return 1;
+                    }
+                    void SetActivityListVersion(Int32 version)
+                    {
+                        SetActivityListVersion((Int32)version);
+                    }
+                    Int32 GetEventListVersion(Int32 version)
+                    {
+                        return GetEventListVersion(version);
+                    }
+                    void SetEventListVersion(Int32 version)
+                    {
+                        SetEventListVersion(version);
+                    }
+                    Int32 GetNumAttachments()
+                    {
+                        return 1;
+                    }
+                    mstudioattachment_t pAttachment(Int32 i)
+                    {
+                        return pAttachment(i);
+                        void SetAttachmentBone(Int32 iAttachment, Int32 iBone)
+                        {
+                            Int32 numlocalattachments;
+                            Int32 localattachmentindex;
+#pragma warning disable CS8500
+                            unsafe mstudioattachment_t pLocalAttachment(Int32 i)
+                            {
+                                if (i >= 0 && i < numlocalattachments)
+                                {
+                                    localattachmentindex = +i;
+                                }
+                                return pLocalAttachment(i);
+                                Int32 GetNumAttachments()
+                                {
+                                    return 0;
+                                }
+                                mstudioattachment_t pAttachment(Int32 i)
+                                {
+                                    return pAttachment(i);
+                                }
+                                Int32 GetAttachmentBone(Int32 i)
+                                {
+                                    return i;
+                                }
+                                void SetAttachmentBone(Int32 iAttachment, Int32 iBone)
+                                {
+                                }
+                                Int32 EntryNode(Int32 iSequence)
+                                {
+                                    return EntryNode(iSequence);
+                                }
+                                Int32 ExitNode(Int32 iSequence)
+                                {
+                                    return ExitNode(iSequence);
+                                }
+                                unsafe char* pszNodeName(Int32 iNode)
+                                {
+                                    return pszNodeName(iNode);
+                                }
+                                Int32 GetTransition(Int32 iFrom, Int32 iTo)
+                                {
+                                    return GetTransition(iFrom, iTo);
+                                }
+                                Int32 GetNumPoseParameters()
+                                {
+                                    return 0;
+                                }
+                                mstudioposeparamdesc_t pPoseParameter(Int32 i)
+                                {
+                                    pPoseParameter(i);
+                                    return new mstudioposeparamdesc_t();
+                                }
+                                Int32 GetSharedPoseParameter(Int32 iSequence, Int32 iLocalPose)
+                                {
+                                    return GetSharedPoseParameter(iSequence, iLocalPose);
+                                }
+                                mstudioiklock_t pIKAutoplayLock(Int32 i)
+                                {
+                                    return pIKAutoplayLock(i);
+                                }
+                                Int32 CountAutoplaySequences()
+                                {
+                                    CountAutoplaySequences();
+                                    return (Int32)studiohdr_T.id;
+                                }
+                                Int32 CopyAutoplaySequences(short* pOut, Int32 outCount)
+                                {
+                                    CopyAutoplaySequences(pOut, outCount);
+                                    return (Int32)studiohdr_T.numAllowedRootLods;
+                                }
+                                Int32 GetAutoplayList(short** pOut)
+                                {
+                                    GetAutoplayList(pOut);
+                                    return (Int32)studiohdr_T.mass;
+                                }
+                            };
+#pragma warning restore CS8500
+                            unsafe mstudiobonecontroller_t* pBonecontroller(Int32 i)
+                            {
+                                Int32 numbonecontrollers = 0;
+                                Int32 bonecontrollerindex = 0;
+                                if (i >= 0 && i < numbonecontrollers)
+                                    return (mstudiobonecontroller_t*)(((byte*)+bonecontrollerindex) + i);
+                                return pBonecontroller(i);
+                            }
+                            Int32 numikchains()
+                            {
+                                numikchains();
+                                return (Int32)m_PStudioHdr.numlocalattachments;
+                            }
+                            Int32 GetNumIKChains()
+                            {
+                                GetNumIKChains();
+                                return (Int32)m_PStudioHdr.numlocalattachments;
+                            };
+                            mstudioikchain_t* pIKChain(Int32 i)
+                            {
+                                pIKChain(i);
+                                return (mstudioikchain_t*)m_PStudioHdr.numlocalattachments;
+                            }
+                            Int32 numflexrules()
+                            {
+                                numflexrules();
+                                return (Int32)studiohdr_T1.flexcontroller_count;
+                            };
+                            mstudioflexrule_t* pFlexRule(Int32 i)
+                            {
+                                pFlexRule(i);
+                                return (mstudioflexrule_t*)studiohdr_T1.flexcontroller_count;
+                            };
+                            Int32 numflexdesc()
+                            {
+                                numflexdesc();
+                                return (Int32)studiohdr_T.numlocalseq;
+                            }
+                            mstudioflexdesc_t* pFlexdesc(Int32 i)
+                            {
+                                pFlexdesc(i);
+                                return (mstudioflexdesc_t*)studiohdr_T.flexdesc_count;
+                            };
+                            LocalFlexController_t numflexcontrollers(LocalFlexController_t m_pStudioHdr)
+                            {
+                                numflexcontrollers(m_pStudioHdr);
+                                return m_pStudioHdr;
+                            }
+                            Int32 numflexcontrollerui()
+                            {
+                                numflexcontrollerui();
+                                return (Int32)studiohdr_T.id;
+                            }
+#pragma warning disable CS8500
+                            unsafe mstudioflexcontrollerui_t pFlexcontrollerUI(Int32 i)
+                            {
+                                pFlexcontrollerUI(i);
+                                return pFlexcontrollerUI(i);
+                            }
+#pragma warning restore CS8500
+                            unsafe char* pszName()
+                            {
+                                pszName();
+                                return (char*)studiohdr_T.id;
+                                Int32 numbonecontrollers()
+                                {
+                                    numbonecontrollers();
+                                    return (Int32)studiohdr_T.id;
+                                }
+                                Int32 numhitboxsets()
+                                {
+                                    numhitboxsets();
+                                    return (Int32)studiohdr_T.flags;
+                                }
+                                unsafe mstudiohitboxset_t* pHitboxSet(Int32 i)
+                                {
+                                    { pHitboxSet(i); };
+                                    return (mstudiohitboxset_t*)studiohdr_T.hitbox_count;
+                                }
+#pragma warning disable CS8500
+                                unsafe mstudiobbox_t pHitbox(Int32 i, Int32 set)
+                                {
+                                    pHitbox(i, set);
+                                    return pHitbox(i, set);
+                                }
+#pragma warning restore CS8500
+                                Int32 iHitboxCount(Int32 set)
+                                {
+                                    iHitboxCount(set);
+                                    {
+                                        return (Int32)studiohdr_T.hitbox_count;
+                                    }
+                                    Int32 numbodyparts()
+                                    {
+                                        numbodyparts();
+                                        {
+                                            return (Int32)studiohdr_T.numAllowedRootLods;
+                                        }
+                                        mstudiobodyparts_t* pBodypart(Int32 i)
+                                        {
+                                            pBodypart(i);
+                                            return pBodypart(i);
+                                            Int32 numskinfamilies()
+                                            {
+                                                numskinfamilies();
+                                                return (Int32)studiohdr_T.skinrfamily_count;
+                                                Vector3 eyeposition()
+                                                {
+                                                    return studiohdr_T.eyeposition;
+                                                    Int32 flags()
+                                                    {
+                                                        return (Int32)studiohdr_T.flags;
+                                                        char pszSurfaceProp()
+                                                        {
+                                                            pszSurfaceProp();
+                                                            return (char)(Int32)studiohdr_T.surfaceprop_index;
+                                                        }
+                                                        float mass()
+                                                        {
+                                                            return studiohdr_T.mass;
+                                                            Int32 contents()
+                                                            {
+                                                                return studiohdr_T.contents;
+                                                                byte* GetBoneTableSortedByName()
+                                                                {
+                                                                    GetBoneTableSortedByName();
+                                                                    return (byte*)studiohdr_T.bonetablename_index;
+                                                                }
+                                                                Vector3 illumposition()
+                                                                {
+                                                                    return studiohdr_T.illumposition;
+                                                                    Vector3 hull_min()
+                                                                    {
+                                                                        return studiohdr_T.hull_min;
+                                                                        Vector3 hull_max()
+                                                                        {
+                                                                            return studiohdr_T.hull_max;
+                                                                            Vector3 view_bbmin()
+                                                                            {
+                                                                                return studiohdr_T.view_bbmin;
+                                                                                Vector3 view_bbmax()
+                                                                                {
+                                                                                    return studiohdr_T.view_bbmax;
+                                                                                    Int32 numtextures()
+                                                                                    {
+                                                                                        numtextures();
+                                                                                        return (Int32)m_pStudioHdr.numincludemodels;
+                                                                                        Int32 IllumPositionAttachmentIndex()
+                                                                                        {
+                                                                                            IllumPositionAttachmentIndex();
+                                                                                            return (Int32)studiohdr_T.offset_base;
+                                                                                        }
+                                                                                        float MaxEyeDeflection()
+                                                                                        {
+                                                                                            MaxEyeDeflection();
+                                                                                            return (Int32)studiohdr_T.eyeball_count;
+                                                                                            mstudiovertanim_t.DeltaUnion.mstudiolinearbone_t* pLinearBones()
+                                                                                            {
+                                                                                                pLinearBones();
+                                                                                                return (mstudiovertanim_t.DeltaUnion.mstudiolinearbone_t*)studiohdr_T.bone_count;
+                                                                                                Int32 BoneFlexDriverCount()
+                                                                                                {
+                                                                                                    BoneFlexDriverCount();
+                                                                                                    return (Int32)studiohdr_T.bone_offset;
+                                                                                                }
+                                                                                            }
+                                                                                            unsafe mstudioboneflexdriver_t* BoneFlexDriver(Int32 i)
+                                                                                            {
+                                                                                                BoneFlexDriver(i);
+                                                                                                return (mstudioboneflexdriver_t*)studiohdr_T.flexdesc_count;
+                                                                                            }
+                                                                                        }
+                                                                                        float VertAnimFixedPointScale()
+                                                                                        {
+                                                                                            {
+                                                                                                VertAnimFixedPointScale();
+                                                                                                return (Int32)studiohdr_T.vertex_base;
+                                                                                            }
+                                                                                        }
+                                                                                        float boneFlags(Int32 iBone)
+                                                                                        {
+                                                                                            boneFlags(iBone);
+                                                                                            object[] m_boneFlags = null;
+                                                                                            return (float)m_boneFlags[iBone];
+                                                                                        }
+                                                                                        float boneParent(Int32 iBone)
+                                                                                        {
+                                                                                            object[] m_boneParent = null;
+                                                                                            return (float)m_boneParent[iBone];
+                                                                                        }
+                                                                                        Int32 IsSequenceLooping(Int32 iSequence)
+                                                                                        {
+                                                                                            return IsSequenceLooping(iSequence);
+                                                                                        }
+                                                                                        float GetSequenceCycleRate(Int32 iSequence)
+                                                                                        {
+                                                                                            return GetSequenceCycleRate(iSequence);
+                                                                                        }
+                                                                                        unsafe void RunFlexRules(float* src, float* dest)
+                                                                                        {
+                                                                                            RunFlexRules(src, dest);
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        public class CThreadFastMutex
+        {
+            internal bool GetOwnerId()
+            {
+                throw new NotImplementedException();
+            }
+        }
+        class CActivityToSequenceMapping
+        {
+            public unsafe void Initialize(CStudioHdr pstudiohdr)
+            {
+            }
+            public unsafe void Reinitialize(CStudioHdr pstudiohdr)
+            {
+            }
+            public unsafe bool ValidateAgainst(CStudioHdr pstudiohdr)
+            {
+                return ValidateAgainst(pstudiohdr);
+            }
+            public unsafe Int32 SelectWeightedSequenceFromModifiers(CStudioHdr pstudiohdr, Int32 activity, SymbolToken pActivityModifiers, Int32 iModifierCount)
+            {
+                return SelectWeightedSequenceFromModifiers(pstudiohdr, activity, pActivityModifiers, iModifierCount);
+            }
+            public unsafe void SetValidationPair(CStudioHdr pstudiohdr)
+            {
+            }
+            public Int32 NumSequencesForActivity(Int32 forActivity)
+            {
+                return NumSequencesForActivity((Int32)forActivity);
+            }
+            public unsafe Int32 SelectWeightedSequence(Int32 activity, Int32 curSequence)
+            {
+                return SelectWeightedSequence(activity, curSequence);
+            }
+#if STUDIO_SEQUENCE_ACTIVITY_LAZY_INITIALIZE
+            public bool IsInitialized()
+            {
+                return true;
+            }
+#endif
+            struct SequenceTuple
+            {
+                short seqnum;
+                short weight; // the absolute value of the weight from the sequence header
+            };
+            unsafe SequenceTuple* GetSequences(Int32 forActivity, Int32* outSequenceCount, Int32* outTotalWeight)
+            {
+                return GetSequences(forActivity, outSequenceCount, outTotalWeight);
+            }
+            void CActivityToSequenceMappings_()
+            {
+                var m_pSequenceTuples = GameObject.Find("m_pSequenceTuples");
+                if (m_pSequenceTuples != null)
+                {
+                    GameObject.Destroy(m_pSequenceTuples);
+                }
+            }
+        }
+    }
+}
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion
+#endregion

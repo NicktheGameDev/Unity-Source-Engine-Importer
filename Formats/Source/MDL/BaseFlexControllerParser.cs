@@ -1,0 +1,84 @@
+﻿using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System;
+using UnityEngine;
+using uSource.Formats.Source.MDL;
+using static uSource.Formats.Source.MDL.StudioStruct;
+
+public class BaseFlexControllerParser 
+{
+    protected List<FlexController> FlexControllers = new List<FlexController>();
+
+    public virtual List<FlexController> ParseFlexControllers(BinaryReader fileStream, int controllerOffset, int controllerCount)
+    {
+        if (fileStream == null) throw new ArgumentNullException(nameof(fileStream));
+        if (controllerOffset < 0 || controllerCount < 0) throw new ArgumentOutOfRangeException("Invalid offset or count");
+
+        for (int i = 0; i < controllerCount; i++)
+        {
+            int currentOffset = controllerOffset + (i * Marshal.SizeOf(typeof(mstudioflexcontroller_t)));
+
+            if (!ValidateOffset(currentOffset, fileStream.BaseStream, $"Invalid flex controller offset at index {i}"))
+            {
+                Debug.LogWarning($"Skipping flex controller at index {i} due to invalid offset.");
+                continue;
+            }
+
+            fileStream.BaseStream.Seek(currentOffset, SeekOrigin.Begin);
+            mstudioflexcontroller_t controllerData = ReadStruct<mstudioflexcontroller_t>(fileStream);
+
+            long nameOffset = currentOffset + controllerData.sznameindex;
+            fileStream.BaseStream.Seek(nameOffset, SeekOrigin.Begin);
+            string name = ReadNullTerminatedString(fileStream);
+
+            FlexControllers.Add(new FlexController
+            {
+                Name = name,
+                Min = controllerData.min,
+                Max = controllerData.max,
+            });
+        }
+
+        return FlexControllers;
+    }
+
+    protected bool ValidateOffset(long offset, Stream stream, string errorMessage)
+    {
+        if (offset < 0 || offset >= stream.Length)
+        {
+            Debug.LogWarning($"Validation failed: {errorMessage}. Offset: {offset}, Stream Length: {stream.Length}");
+            return false;
+        }
+        return true;
+    }
+
+    private T ReadStruct<T>(BinaryReader reader) where T : struct
+    {
+        int size = Marshal.SizeOf(typeof(T));
+        byte[] buffer = reader.ReadBytes(size);
+        GCHandle handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        T structure;
+        try
+        {
+            structure = Marshal.PtrToStructure<T>(handle.AddrOfPinnedObject());
+        }
+        finally
+        {
+            handle.Free();
+        }
+        return structure;
+    }
+
+    private string ReadNullTerminatedString(BinaryReader reader)
+    {
+        List<byte> bytes = new List<byte>();
+        while (true)
+        {
+            byte b = reader.ReadByte();
+            if (b == 0) break;
+            bytes.Add(b);
+        }
+        return System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+    }
+}

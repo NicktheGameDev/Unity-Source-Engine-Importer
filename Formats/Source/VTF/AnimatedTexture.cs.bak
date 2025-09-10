@@ -1,0 +1,73 @@
+
+using UnityEngine;
+
+namespace uSource.Formats.Source.VTF
+{
+    [RequireComponent(typeof(MeshRenderer))]
+    public class AnimatedTexture : MonoBehaviour
+    {
+        [Tooltip("Frames per second")]
+        [Min(0.1f)]
+        public float AnimatedTextureFramerate = 10f;
+
+        public Texture2D[] Frames = new Texture2D[0];
+
+        public MeshRenderer Renderer;
+
+        private MaterialPropertyBlock _propBlock;
+        private int currentFrame = 0;
+        private float timer = 0f;
+        private int _mainTexId;
+
+        void Awake()
+        {
+            if (Renderer == null)
+                Renderer = GetComponent<MeshRenderer>();
+
+            _propBlock = new MaterialPropertyBlock();
+            _mainTexId = Shader.PropertyToID("_MainTex");
+        }
+
+        void OnEnable()
+        {
+            ResetAnimation();
+        }
+
+        void Update()
+        {
+            if (Frames == null || Frames.Length == 0 || Renderer == null)
+                return;
+
+            float fps = Mathf.Max(0.1f, AnimatedTextureFramerate);
+            float interval = 1f / fps;
+
+            timer += Time.deltaTime;
+            if (timer < interval)
+                return;
+
+            timer -= interval;
+
+            int nextFrame = (currentFrame + 1) % Frames.Length;
+            if (nextFrame == currentFrame)
+                return;
+
+            currentFrame = nextFrame;
+
+            Renderer.GetPropertyBlock(_propBlock);
+            _propBlock.SetTexture(_mainTexId, Frames[currentFrame]);
+            Renderer.SetPropertyBlock(_propBlock);
+        }
+
+        public void ResetAnimation()
+        {
+            currentFrame = 0;
+            timer = 0f;
+            if (Frames == null || Frames.Length == 0 || Renderer == null)
+                return;
+
+            Renderer.GetPropertyBlock(_propBlock);
+            _propBlock.SetTexture(_mainTexId, Frames[0]);
+            Renderer.SetPropertyBlock(_propBlock);
+        }
+    }
+}

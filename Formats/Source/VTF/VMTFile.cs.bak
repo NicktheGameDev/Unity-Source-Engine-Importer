@@ -1,0 +1,565 @@
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
+
+namespace uSource.Formats.Source.VTF
+{
+    public class VMTFile
+    {
+        public string FileName = "";
+
+        public VMTFile Include;
+        public string ShaderType;
+        public string SurfaceProp;
+        public Material Material;
+        public Material DefaultMaterial;
+        public static int TransparentQueue = 3001;
+
+        #region KeyValues
+        public KeyValues.Entry this[string shader] => KeyValues[shader];
+        public KeyValues KeyValues;
+
+        // Cache parsed params to avoid re-parsing repeatedly
+        private readonly Dictionary<string, string> _stringCache = new();
+        private readonly Dictionary<string, float> _floatCache = new();
+        private readonly Dictionary<string, int> _intCache = new();
+        private readonly Dictionary<string, Vector4> _vector4Cache = new();
+        private readonly Dictionary<string, bool> _boolCache = new();
+
+        private static readonly Regex FloatRegex = new(@"[+-]?([0-9]*[.])?[0-9]+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        public bool ContainsParam(string param)
+        {
+            if (string.IsNullOrEmpty(ShaderType)) return false;
+            return KeyValues != null && this[ShaderType].ContainsKey(param);
+        }
+
+        public string GetParam(string param)
+        {
+            if (_stringCache.TryGetValue(param, out var cached)) return cached;
+            string val = this[ShaderType][param];
+            _stringCache[param] = val;
+            return val;
+        }
+
+        public float GetSingle(string param)
+        {
+            if (_floatCache.TryGetValue(param, out var f)) return f;
+            string s = GetParam(param);
+            if (!float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f))
+                f = 0f;
+            _floatCache[param] = f;
+            return f;
+        }
+
+        public Vector4 GetVector4(string param, bool swap = false)
+        {
+            string key = param + (swap ? "_swap" : "_noswap");
+            if (_vector4Cache.TryGetValue(key, out var v)) return v;
+
+            string raw = GetParam(param);
+            var matches = FloatRegex.Matches(raw);
+            Vector4 result = Vector4.zero;
+            result.x = matches.Count >= 1 ? ParseFloatInvariant(matches[0].Value) : 0f;
+            result.y = matches.Count >= 2 ? ParseFloatInvariant(matches[1].Value) : (swap ? result.x : 0f);
+            result.z = matches.Count >= 3 ? ParseFloatInvariant(matches[2].Value) : (swap ? result.y : 0f);
+            result.w = matches.Count > 3 ? ParseFloatInvariant(matches[3].Value) : (swap ? result.z : 0f);
+
+            _vector4Cache[key] = result;
+            return result;
+        }
+
+        public Vector3 GetVector3(string param, bool swap = false)
+        {
+            var v4 = GetVector4(param, swap);
+            return new Vector3(v4.x, v4.y, v4.z);
+        }
+
+        public Vector2 GetVector2(string param, bool swap = false)
+        {
+            var v4 = GetVector4(param, swap);
+            return new Vector2(v4.x, v4.y);
+        }
+
+        public int GetInteger(string param)
+        {
+            if (_intCache.TryGetValue(param, out var i)) return i;
+            string s = GetParam(param);
+            if (!int.TryParse(s, out i))
+                i = 0;
+            _intCache[param] = i;
+            return i;
+        }
+
+        public Color32 GetColor()
+        {
+            Color32 matColor = new(255, 255, 255, 255);
+            if (ContainsParam("$color"))
+                matColor = this[ShaderType]["$color"];
+            if (ContainsParam("$alpha"))
+            {
+                float alpha = GetSingle("$alpha");
+                matColor.a = (byte)(255 * alpha);
+            }
+            return matColor;
+        }
+
+        public bool IsTrue(string input, bool containsCheck = true)
+        {
+            if (_boolCache.TryGetValue(input, out var b)) return b;
+            bool result = false;
+            if (containsCheck && ContainsParam(input))
+            {
+                result = this[ShaderType][input] == true;
+            }
+            _boolCache[input] = result;
+            return result;
+        }
+
+        private static float ParseFloatInvariant(string s)
+        {
+            if (float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f))
+                return f;
+            return 0f;
+        }
+        #endregion
+
+        public bool HasAnimation = false;
+
+        private const string _BaseColorMap = "_BaseColorMap";
+        private const string _MaskMap = "_MaskMap";
+        private const string _DetailMap = "_DetailMap";
+        private const string _Layer2BaseColorMap = "_Layer2BaseColorMap";
+        private const string _Layer2MaskMap = "_Layer2MaskMap";
+
+        // local texture cache per (name, slot)
+        private readonly Dictionary<(string texName, string slot), Texture2D> _localTexCache = new();
+
+        // avoid enabling same keywords repeatedly
+        private readonly HashSet<string> _enabledKeywords = new();
+
+        public VMTFile(Stream stream, string FileName = "")
+        {
+            this.FileName = FileName;
+            if (stream == null)
+            {
+                MakeDefaultMaterial();
+                return;
+            }
+
+            KeyValues = KeyValues.FromStream(stream);
+            if (KeyValues != null && KeyValues.Keys != null && KeyValues.Keys.Any())
+            {
+                ShaderType = KeyValues.Keys.First();
+                if (string.IsNullOrEmpty(ShaderType))
+                    throw new FileLoadException($"Shader type is missing in material, skip parse {FileName}");
+            }
+            else
+            {
+                throw new FileLoadException($"is missing any KeyValues data, skip parse {FileName}");
+            }
+        }
+
+        void MakeDefaultMaterial()
+        {
+            if (DefaultMaterial != null) return;
+
+#if UNITY_EDITOR
+            if (uLoader.SaveAssetsToUnity)
+            {
+                Material = DefaultMaterial = uResourceManager.LoadAsset<Material>(FileName, uResourceManager.MaterialsExtension[0], ".mat");
+                if (Material != null) return;
+            }
+#endif
+            Material = DefaultMaterial = new Material(Shader.Find("Diffuse")) { name = FileName };
+#if UNITY_EDITOR
+            if (uLoader.SaveAssetsToUnity)
+            {
+                uResourceManager.SaveAsset(Material, FileName, uResourceManager.MaterialsExtension[0], ".mat");
+            }
+#endif
+        }
+
+        public void CreateMaterial()
+        {
+            if (ContainsParam("replace"))
+                this[ShaderType].MergeFrom(this[ShaderType]["replace"], true);
+            if (ContainsParam("include"))
+            {
+                Include = uResourceManager.LoadMaterial(GetParam("include"));
+                this[ShaderType].MergeFrom(Include[Include.ShaderType], false);
+            }
+            if (ContainsParam("insert"))
+                this[ShaderType].MergeFrom(this[ShaderType]["insert"], false);
+            if (ContainsParam("$fallbackmaterial"))
+            {
+                Include = uResourceManager.LoadMaterial(GetParam("$fallbackmaterial"));
+                this[ShaderType].MergeFrom(Include[Include.ShaderType], true);
+            }
+
+#if UNITY_EDITOR
+            if (uLoader.SaveAssetsToUnity)
+            {
+                Material = uResourceManager.LoadAsset<Material>(FileName,
+                                                                uResourceManager.MaterialsExtension[0],
+                                                                ".mat");
+                if (Material != null) return;
+            }
+#endif
+
+            string texName;
+            string slot;
+            Texture2D baseTex = null;
+            bool hasAlpha = false;
+
+            if (ContainsParam("$basetexture") || ContainsParam("$envmapmask"))
+            {
+                texName = ContainsParam("$basetexture") ? GetParam("$basetexture") : GetParam("$envmapmask");
+                baseTex = LoadTextureCached(texName, _BaseColorMap);
+#if UNITY_EDITOR
+                if (baseTex != null) hasAlpha = baseTex.alphaIsTransparency;
+#endif
+            }
+
+            bool isHDRP = GraphicsSettings.currentRenderPipeline is HDRenderPipelineAsset;
+            Material = new Material(GetShader(Include == null ? ShaderType : Include.ShaderType, hasAlpha))
+            {
+                name = FileName,
+                color = GetColor()
+            };
+            if (baseTex != null) Material.mainTexture = baseTex;
+
+            #region Additional textures
+            if (ContainsParam("$basetexture2"))
+            {
+                texName = GetParam("$basetexture2");
+                slot = _Layer2BaseColorMap;
+                if (Material.HasProperty(slot))
+                {
+                    var tex = LoadTextureCached(texName, slot);
+                    if (tex != null) Material.SetTexture(slot, tex);
+                }
+            }
+
+            slot = isHDRP ? "_NormalMap" : "_BumpMap";
+            ApplyBumpMap("$bumpmap", slot, isHDRP);
+            ApplyBumpMap("$bumpmap2", slot + "2", isHDRP);
+            #endregion
+
+            if (ContainsParam("$ssbump"))
+            {
+                slot = "_SSBumpMap";
+                texName = GetParam("$ssbump");
+                if (Material.HasProperty(slot))
+                {
+                    var tex = LoadTextureCached(texName, slot);
+                    if (tex != null)
+                    {
+                        Material.SetTexture(slot, tex);
+                        EnableKeywordOnce("_SSBUMPMAP");
+                    }
+                }
+            }
+
+            if (IsTrue("$translucent")) Material.renderQueue = TransparentQueue++;
+            if (IsTrue("$alphatest")) Material.renderQueue = (int)RenderQueue.AlphaTest;
+            if (IsTrue("$nocull") && Material.HasProperty("_Cull"))
+                Material.SetInt("_Cull", 0);
+
+            if (ContainsParam("$detail") && Material.HasProperty(_DetailMap))
+            {
+                texName = GetParam("$detail");
+                var detailTex = LoadTextureCached(texName, _DetailMap);
+                if (detailTex != null)
+                {
+                    Material.SetTexture(_DetailMap, detailTex);
+                    if (ContainsParam("$detailscale"))
+                        Material.SetTextureScale(_DetailMap, GetVector2("$detailscale", true));
+
+                    if (Material.HasProperty("_DetailFactor"))
+                    {
+                        Material.SetFloat("_DetailFactor",
+                            ContainsParam("$detailblendfactor")
+                                ? GetSingle("$detailblendfactor") / 2f
+                                : 0.5f);
+                        if (ContainsParam("$detailblendmode"))
+                            Material.SetInt("_DetailBlendMode", GetInteger("$detailblendmode"));
+                    }
+                }
+            }
+
+            TryMask("$envmapmask", _MaskMap, "_ENVMAPMASK", "$envmapmaskscale");
+            TryMask("$envmap", "_Reflection", "_REFLECTION", null);
+
+            if (IsTrue("$additive")) Material.SetInt("_SrcBlend", (int)BlendMode.One);
+
+            SimpleTexture("$phong", "_Phong", "_PHONG");
+            SimpleTexture("$rimlight", "_RimLight", "_RIM_LIGHTING");
+            SimpleTexture("$lightwarptexture", "_LightWarp", "_LIGHTWARP");
+            SimpleTexture("$parallaxmap", "_ParallaxMap", "_PARALLAX_MAP");
+            SimpleTexture("$selfillum", "_Emission", "_EMISSION");
+            SimpleTexture("$surfaceprop", "_SurfaceProp", "_SURFACEPROP");
+            SimpleTexture("$halflambert", "_HalfLambert", "_HALFLAMBERT");
+            SimpleTexture("$burning", "_Burning", "_BURNING");
+
+            if (ContainsParam("$flesh"))
+            {
+                ApplyFleshBranch("$flesh", "_Flesh", "_FLESH", null);
+                ApplyFleshBranch("$frame", "_Frame", "_FRAME", "$decalscale");
+                ApplyFleshBranch("$decal", "_Decal", "_DECAL", "$decalscale");
+                ApplyFleshBranch("$decaltexture", "_DecalTexture", "_DECALTEXTURE", "$decalscale");
+                ApplyFleshBranch("$metalness", "_Metalness", "_METALNESS", null);
+                ApplyFleshBranch("$mask1", _MaskMap, "_MASK_1", null);
+                ApplyFleshBranch("$mask2", _Layer2MaskMap, "_LAYER_2_MASK_MAP", null);
+                ApplyFleshBranch("$maskstexture", _MaskMap, "_MASKS_TEXTURE", null);
+                ApplyFleshBranch("$fresnelreflection", "_FresnelReflection", "_FRESNEL_REFLECTION", "$envmaplightscale");
+                ApplyFleshBranch("$reflectivity", "_Reflectivity", "_REFLECTIVITY", null);
+                ApplyFleshBranch("$fresnelrangestexture", "_FrenselRangesTexture", "_FRESNEL_RANGES_TEXTURE", null);
+
+                if (ContainsParam("$color") && Material.HasProperty("_Color"))
+                {
+                    Material.color = GetColor();
+                    Material.SetColor("_Color", GetColor());
+                    EnableKeywordOnce("_COLOR");
+                }
+
+                string srcKey = GetParam("$phongexponenttexture");
+                var grid = uResourceManager.LoadTexture(srcKey);
+                if (grid == null || grid.Length == 0 || grid[0, 0] == null)
+                    return;
+                Texture2D tex = grid[0, 0];
+
+                string[] propCandidates =
+                {
+                    "_SpecularColorMap",
+                    "_SpecGlossMap",
+                    "_MaskMap"
+                };
+
+                foreach (string p in propCandidates)
+                {
+                    if (!Material.HasProperty(p)) continue;
+
+                    Material.SetTexture(p, tex);
+                    if (p == "_SpecularColorMap")
+                    {
+                        EnableKeywordOnce("SPECULAR_COLOR_MAP");
+                    }
+                    else if (p == "_SpecGlossMap")
+                    {
+                        EnableKeywordOnce("_SPECULAR_SETUP");
+                        EnableKeywordOnce("_METALLICSPECGLOSSMAP");
+                    }
+                    break;
+                }
+            }
+
+            // Setup animated texture if present (reuse helper if exists)
+            if (Material != null)
+            {
+                var existing = GameObject.Find($"AnimatedTexHelper_{FileName}");
+                GameObject animHelper = existing ?? new GameObject($"AnimatedTexHelper_{FileName}");
+                if (existing == null)
+                    animHelper.hideFlags = HideFlags.HideAndDontSave;
+
+                var animScript = animHelper.GetComponent<AnimatedTexture>();
+                if (animScript == null) animScript = animHelper.AddComponent<AnimatedTexture>();
+                if (animScript.Renderer == null)
+                {
+                    animScript.Renderer = null;
+                }
+                SetupAnimations(ref animScript);
+                if (animScript.Frames != null && animScript.Frames.Length > 0 && Material.mainTexture == null)
+                {
+                    Material.mainTexture = animScript.Frames[0];
+                }
+            }
+        }
+
+        private Texture2D LoadTextureCached(string texName, string slot)
+        {
+            var key = (texName, slot);
+            if (_localTexCache.TryGetValue(key, out var cached))
+                return cached;
+
+            Texture2D[,] grid = uResourceManager.LoadTexture(texName,
+                ExportData: new string[,] { { FileName, slot } });
+
+            Texture2D result = (grid != null && grid.Length > 0) ? grid[0, 0] : null;
+            if (result != null)
+                _localTexCache[key] = result;
+            return result;
+        }
+
+        private void EnableKeywordOnce(string kw)
+        {
+            if (_enabledKeywords.Contains(kw)) return;
+            Material.EnableKeyword(kw);
+            _enabledKeywords.Add(kw);
+        }
+
+        private void SimpleTexture(string vmtKey, string targetSlot, string keyword)
+        {
+            if (!ContainsParam(vmtKey) || !Material.HasProperty(targetSlot)) return;
+            string texName = GetParam(vmtKey);
+            var tex = LoadTextureCached(texName, targetSlot);
+            if (tex == null) return;
+            Material.SetTexture(targetSlot, tex);
+            EnableKeywordOnce(keyword);
+        }
+
+        private void ApplyFleshBranch(string vmtKey, string targetSlot, string keyword, object scaleKeyObj)
+        {
+            if (!ContainsParam(vmtKey) || !Material.HasProperty(targetSlot)) return;
+
+            if (scaleKeyObj is string scaleKey && !string.IsNullOrEmpty(scaleKey) && ContainsParam(scaleKey))
+            {
+                Material.SetTextureScale(targetSlot, GetVector2(scaleKey, true));
+            }
+
+            string texName = GetParam(vmtKey);
+            var tex = LoadTextureCached(texName, targetSlot);
+            if (tex == null) return;
+            Material.SetTexture(targetSlot, tex);
+            EnableKeywordOnce(keyword);
+        }
+
+        private void ApplyBumpMap(string vmtKey, string targetSlot, bool isHDRP)
+        {
+            if (!ContainsParam(vmtKey) || !Material.HasProperty(targetSlot)) return;
+
+            if (ContainsParam("$bumpscale"))
+                Material.SetTextureScale(targetSlot, GetVector2("$bumpscale", true));
+
+            Texture2D tex = LoadTextureCached(GetParam(vmtKey), targetSlot);
+            if (tex == null) return;
+
+            Material.SetTexture(targetSlot, tex);
+            if (isHDRP)
+            {
+                EnableKeywordOnce(targetSlot.EndsWith("2") ? "_NORMALMAP2" : "_NORMALMAP");
+            }
+            else
+            {
+                EnableKeywordOnce(targetSlot.EndsWith("2") ? "_BUMPMAP2" : "_BUMPMAP");
+            }
+        }
+
+        private void TryMask(string vmtKey, string targetSlot, string keyword, string scaleKey)
+        {
+            if (!ContainsParam(vmtKey) || !Material.HasProperty(targetSlot)) return;
+
+            if (!string.IsNullOrEmpty(scaleKey) && ContainsParam(scaleKey))
+                Material.SetTextureScale(targetSlot, GetVector2(scaleKey, true));
+
+            var tex = LoadTextureCached(GetParam(vmtKey), targetSlot);
+            if (tex == null) return;
+
+            Material.SetTexture(targetSlot, tex);
+            EnableKeywordOnce(keyword);
+        }
+
+        private Texture2D[] LoadAnimatedFrames(string baseName)
+        {
+            var frames = new List<Texture2D>();
+            for (int i = 0; ; i++)
+            {
+                string frameKey = $"{baseName}_{i:000}";
+                var tex = LoadTextureCached(frameKey, _BaseColorMap);
+                if (tex == null) break;
+                frames.Add(tex);
+            }
+            return frames.Count > 0 ? frames.ToArray() : null;
+        }
+
+        public void SetupAnimations(ref AnimatedTexture ControlScript)
+        {
+            float fps = 0f;
+            if (ContainsParam("animatedtextureframerate"))
+            {
+                fps = GetSingle("animatedtextureframerate");
+                if (fps <= 0) fps = 1f;
+            }
+            ControlScript.AnimatedTextureFramerate = fps;
+
+            string baseTexName = null;
+            if (ContainsParam("$basetexture"))
+                baseTexName = GetParam("$basetexture");
+
+            Texture2D[] frames = null;
+            if (!string.IsNullOrEmpty(baseTexName))
+            {
+                frames = LoadAnimatedFrames(baseTexName);
+                if (frames == null)
+                {
+                    var single = LoadTextureCached(baseTexName, _BaseColorMap);
+                    if (single != null)
+                        frames = new[] { single };
+                }
+            }
+
+            if (frames != null && frames.Length > 0)
+            {
+                ControlScript.Frames = frames;
+            }
+            else
+            {
+                Debug.LogWarning($"[VMTFile] No animated or base texture frames found for {FileName}");
+            }
+        }
+
+        public Shader GetShader(string shader, bool HasAlpha = false)
+        {
+            if (!string.IsNullOrEmpty(shader))
+            {
+                if (IsTrue("$additive"))
+                    return Shader.Find(uLoader.AdditiveShader);
+                if (ContainsParam("$detail"))
+                {
+                    if (shader.Equals("unlitgeneric"))
+                        return Shader.Find(uLoader.DetailUnlitShader);
+                    if (shader.Equals("worldtwotextureblend"))
+                        return Shader.Find(uLoader.WorldTwoTextureBlend);
+                    if (IsTrue("$translucent"))
+                        return Shader.Find(uLoader.DetailTranslucentShader);
+                    return Shader.Find(uLoader.DetailShader);
+                }
+                if ((IsTrue("$translucent") && HasAlpha) || (ContainsParam("$alpha") && !IsTrue("$alpha", false)))
+                {
+                    if (shader.Equals("unlitgeneric"))
+                        return Shader.Find(uLoader.TranslucentUnlitShader);
+                    return Shader.Find(uLoader.TranslucentShader);
+                }
+                if (IsTrue("$alphatest"))
+                {
+                    return Shader.Find(uLoader.AlphaTestShader);
+                }
+                if (IsTrue("$selfillum") && (HasAlpha || ContainsParam("$envmapmask")))
+                {
+                    return Shader.Find(uLoader.SelfIllumShader);
+                }
+                if (shader.Equals("lightmappedgeneric"))
+                    return Shader.Find(uLoader.LightmappedGenericShader);
+                if (shader.Equals("vertexlitgeneric"))
+                    return Shader.Find(uLoader.VertexLitGenericShader);
+                if (shader.Equals("worldvertextransition"))
+                {
+                    if (ContainsParam("$basetexture2"))
+                        return Shader.Find(uLoader.WorldVertexTransitionShader);
+                    return Shader.Find(uLoader.DefaultShader);
+                }
+                if (shader.Equals("WorldTwoTextureBlend"))
+                    return Shader.Find(uLoader.WorldTwoTextureBlend);
+                if (shader.Equals("unlitgeneric"))
+                    return Shader.Find(uLoader.UnlitGeneric);
+            }
+            return Shader.Find(uLoader.DefaultShader);
+        }
+    }
+}

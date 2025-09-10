@@ -7,6 +7,12 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using System.Text.RegularExpressions;
+using uSource.Formats.Source.MDL;
+using UnityEditor.Animations;
+using System.IO;
+
+
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -601,24 +607,99 @@ namespace uSource
             return color;
         }
 
-        public static short[] ReadAnimationFrameValues(this System.IO.BinaryReader br, Int32 count)
+        /// <summary>
+        /// Reads an RLE‑encoded animation frame exactly <paramref name="count"/> values long.
+        /// The format encodes a series of runs. Each run starts with two bytes:
+        /// <list type="bullet">
+        /// <item><description><c>compressedLength</c> – number of 16‑bit values that follow.</description></item>
+        /// <item><description><c>uncompressedLength</c> – how many output samples this run represents.</description></item>
+        /// </list>
+        /// The first <c>compressedLength</c> samples are copied verbatim.  If
+        /// <c>uncompressedLength</c> is longer, the last sample in the run is repeated
+        /// to pad out the run so that it expands to exactly <c>uncompressedLength</c>
+        /// values.
+        /// <para>
+        /// This implementation is fault‑tolerant: it never aborts early.  Instead,
+        /// when it encounters truncated or ill‑formed data it fills the rest of the
+        /// frame with the last successfully read value (or <c>0</c> if nothing has
+        /// been read yet).  That guarantees callers always receive an array that is
+        /// exactly <paramref name="count"/> elements long, which is what Unity’s
+        /// animation import pipeline expects.
+        /// </para>
+        /// </summary>
+        /// 
+        public static void LoadAnimationsToModel(this MDLFile mdl, Animator animator, string assetFolder, Dictionary<int, string> bonePathDict)
         {
-            /*
-             * RLE data:
-             * Byte compressed_length - compressed number of values in the data
-             * Byte uncompressed_length - uncompressed number of values in run
-             * short values[compressed_length] - values in the run, the last value is repeated to reach the uncompressed length
-             */
-            Int16[] values = new Int16[count];
-
-            for (var i = 0; i < count; /* i = i */)
+            if (!AssetDatabase.IsValidFolder(assetFolder))
             {
-                Byte[] run = br.ReadBytes(2); // read the compressed and uncompressed lengths
-                Int16[] vals = br.ReadShortArray(run[0]); // read the compressed data
-                for (Int32 j = 0; j < run[1] && i < count; i++, j++)
+                var parent = Path.GetDirectoryName(assetFolder);
+                var folder = Path.GetFileName(assetFolder);
+                if (AssetDatabase.IsValidFolder(parent))
+                    AssetDatabase.CreateFolder(parent, folder);
+            }
+
+            string controllerPath = Path.Combine(assetFolder, mdl.MDL_Header.Name.Replace(" ", "_") + "_Controller.controller");
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+
+            foreach (var anim in mdl.Animations)
+            {
+                var clip = mdl.CreateAnimationClip(anim, bonePathDict);
+                clip.name = anim.name.Replace(" ", "_");
+                string clipPath = Path.Combine(assetFolder, clip.name + ".anim");
+                AssetDatabase.CreateAsset(clip, clipPath);
+                controller.AddMotion(clip);
+            }
+
+            animator.runtimeAnimatorController = controller;
+            AssetDatabase.SaveAssets();
+        }
+        
+        public static short[] ReadAnimationFrameValues(this System.IO.BinaryReader br, int count)
+        {
+            var values = new short[count];
+            int i = 0;
+            short last = 0;
+
+            while (i < count)
+            {
+                // Try to read the 2‑byte RLE header
+                byte[] runHeader = br.ReadBytes(2);
+                if (runHeader.Length < 2)
                 {
-                    Int32 idx = Math.Min(run[0] - 1, j); // value in the data or the last value if we're past the end
-                    values[i] = vals[idx];
+                    // Couldn't read header → repeat last value for the rest
+                    for (; i < count; i++)
+                        values[i] = last;
+                    break;
+                }
+
+                int compressedLength = runHeader[0];
+                int uncompressedLength = runHeader[1];
+
+                // Sanity‑check lengths
+                if (compressedLength <= 0 || uncompressedLength <= 0)
+                {
+                    // Invalid header → repeat last value for the rest
+                    for (; i < count; i++)
+                        values[i] = last;
+                    break;
+                }
+
+                // Read compressed block (may be shorter if file ends early)
+                short[] runValues = new short[compressedLength];
+                for (int k = 0; k < compressedLength; k++)
+                {
+                    if (br.BaseStream.Position + 2 <= br.BaseStream.Length)
+                        runValues[k] = br.ReadInt16();
+                    else
+                        runValues[k] = last;
+                }
+
+                // Unpack
+                for (int j = 0; j < uncompressedLength && i < count; j++, i++)
+                {
+                    int idx = j < compressedLength ? j : (compressedLength - 1);
+                    last = runValues[idx];
+                    values[i] = last;
                 }
             }
 
@@ -711,8 +792,11 @@ namespace uSource
             while ((r = input.Read(b, 0, b.Length)) > 0)
                 output.Write(b, 0, r);
         }
+    
+    /// </summary>
+       
     }
-
+}
     /// <summary>
     /// Extension BinaryReaders
     /// </summary>
@@ -787,4 +871,3 @@ namespace uSource
             return arr;
         }
     }
-}
